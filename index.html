@@ -479,6 +479,24 @@ input.ap{font:inherit;font-family:var(--mono);font-size:13px;width:100%;min-widt
 .mode.warn.on{border-color:var(--neg);background:color-mix(in srgb,var(--neg) 8%,transparent)}
 .mode input{margin-top:3px;width:18px;height:18px;flex:none;accent-color:var(--accent)}
 .mode b{display:block;font-size:14px}
+
+.gearbtn{min-width:40px;padding:0 10px;display:inline-flex;align-items:center;justify-content:center}
+.gearbtn svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.setgrp{display:flex;flex-direction:column;gap:6px}
+.setgrp.setsep{margin-top:6px;padding-top:14px;border-top:1px solid var(--line)}
+.setlbl{font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.setmail{font-size:13px;color:var(--ink2);overflow-wrap:anywhere;padding:0 2px 2px}
+.setitem{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;gap:12px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--surface);width:100%}
+.setitem:hover{background:var(--wash)}
+.setitem:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.seti{width:38px;height:38px;flex:none;border-radius:10px;background:var(--cat);color:var(--catink);display:inline-flex;align-items:center;justify-content:center}
+.seti svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.sett{display:flex;flex-direction:column;gap:1px;min-width:0}
+.sett b{font-size:15px}
+.sett small{font-size:12px;color:var(--ink2);line-height:1.3}
+.setitem.danger{border-color:color-mix(in srgb,var(--neg) 40%,transparent)}
+.setitem.danger .seti{background:color-mix(in srgb,var(--neg) 12%,transparent);color:var(--neg)}
+.setitem.danger .sett b{color:var(--neg)}
 .mode small{display:block;color:var(--ink2);font-size:12px;margin-top:2px;line-height:1.35}
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -521,13 +539,7 @@ body.lg-on .wrap,body.lg-on #nav{display:none!important}
           <p class="sub" id="sub">Cargando tus datos…</p>
         </div>
       </div>
-      <div class="actions">
-        <button class="btn primary" id="btnAdd" type="button">Activos</button>
-        <button class="btn" id="btnCsv" type="button">Exportar CSV</button>
-      <button class="btn" id="btnBak" type="button">Copia de seguridad</button>
-      <button class="btn" id="btnRes" type="button">Cargar copia</button>
-      <button class="btn" id="btnOut" type="button">Cerrar sesión</button>
-      </div>
+      <div class="actions"><button class="btn primary" id="btnAdd" type="button">Activos</button><button class="btn gearbtn" id="btnGear" type="button" aria-label="Ajustes" title="Ajustes"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button></div>
     </div>
     <div class="kpis" id="kpis"></div>
   </section>
@@ -1759,6 +1771,7 @@ document.addEventListener("click",function(e){
   if(t.id==="d-auto"){autoDolar();return}
   if(t.id==="a-save"){saveActivos();return}
   if(t.id==="rs-go"){doImport();return}
+  if((b=t.closest("[data-set]"))){runSet(b.dataset.set);return}
   if(t.closest("[data-imclear]")){openRestore();return}
   if((b=t.closest("#nav button,#tabs button"))){setView(b.dataset.view);return}
   if((b=t.closest("[data-mmove]"))){
@@ -1913,7 +1926,6 @@ window.addEventListener("pointerup",endDrag);
 window.addEventListener("pointercancel",endDrag);
 window.addEventListener("blur",endDrag);
 $("btnAdd").addEventListener("click",openActivos);
-$("btnCsv").addEventListener("click",exportCsv);
 $("ySel").addEventListener("change",function(){setYear(Number(this.value))});
 $("yPrev").addEventListener("click",function(){setYear(YEAR-1)});
 $("yNext").addEventListener("click",function(){setYear(YEAR+1)});
@@ -1928,6 +1940,25 @@ function saveFile(name,text,type){
 function backup(){
   var d=new Date(),f=d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());
   saveFile("inversiones-copia-"+f+".json",JSON.stringify({version:2,exportado:d.toISOString(),activos:store.activos,aportesPorAnio:store.aportesPorAnio,dolar:store.dolar||null,meta:store.meta||null,ahorros:store.ahorros||{}},null,1),"application/json");
+}
+
+/* ---------- ajustes (engranaje) ---------- */
+var SETICO={"imp": "<path d=\"M12 16V4M7 9l5-5 5 5\"/><path d=\"M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3\"/>", "csv": "<path d=\"M12 4v12M7 11l5 5 5-5\"/><path d=\"M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3\"/>", "bak": "<path d=\"M12 3l8 3v6c0 4.5-3.2 7.8-8 9-4.8-1.200-8-4.500-8-9V6z\"/><path d=\"M9 12l2 2 4-4\"/>", "usd": "<circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M12 6.500v11M15 9.200c-.5-1-1.600-1.600-3-1.600-1.700 0-3 .9-3 2.200 0 3 6 1.500 6 4.200 0 1.300-1.300 2.200-3 2.200-1.400 0-2.500-.6-3-1.600\"/>", "out": "<path d=\"M9 21H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h4M16 17l5-5-5-5M21 12H9\"/>"};
+function setItem(k,t,d,cls){return '<button type="button" class="setitem'+(cls?" "+cls:"")+'" data-set="'+k+'"><span class="seti"><svg viewBox="0 0 24 24" aria-hidden="true">'+SETICO[k]+'</svg></span><span class="sett"><b>'+t+'</b><small>'+d+'</small></span></button>'}
+function openAjustes(){
+  var u=auth.currentUser,h=sheetHead("Ajustes","");
+  h+='<div class="setgrp"><div class="setlbl">Datos</div>'+setItem("imp","Importar datos","Desde Excel, CSV o una copia de seguridad")+setItem("csv","Exportar CSV","Descargá el año que estás viendo")+setItem("bak","Copia de seguridad","Descargá todos tus datos en un archivo")+'</div>';
+  h+='<div class="setgrp"><div class="setlbl">Moneda</div>'+setItem("usd","Dólar","Elegí MEP, Oficial, Blue o CCL, o escribilo a mano")+'</div>';
+  h+='<div class="setgrp setsep"><div class="setlbl">Cuenta</div>'+(u&&u.email?'<div class="setmail">'+esc(u.email)+'</div>':'')+setItem("out","Cerrar sesión","Salir en este dispositivo","danger")+'</div>';
+  openSheet(h);
+}
+function runSet(k){
+  if(k==="imp"){openRestore();return}
+  if(k==="usd"){openDolar();return}
+  closeSheet();
+  if(k==="csv")exportCsv();
+  else if(k==="bak")backup();
+  else if(k==="out")auth.signOut().then(function(){location.reload()});
 }
 /* ---------- importar datos (.json, .csv, .xlsx) ---------- */
 var imp=null,impMode="sum",impSure=false,impYear=YEAR;
@@ -2318,9 +2349,7 @@ $("lg-in").addEventListener("click",function(){lgGo("in")});
 $("lg-new").addEventListener("click",function(){lgGo("new")});
 $("lg-rst").addEventListener("click",function(){lgGo("reset")});
 $("lg-form").addEventListener("submit",function(e){e.preventDefault();lgGo("in")});
-$("btnOut").addEventListener("click",function(){auth.signOut().then(function(){location.reload()})});
-$("btnBak").addEventListener("click",backup);
-$("btnRes").addEventListener("click",openRestore);
+$("btnGear").addEventListener("click",openAjustes);
 
 /* datos en la nube */
 function stopListeners(){unsubs.forEach(function(u){try{u()}catch(e){}});unsubs=[]}
@@ -2360,7 +2389,6 @@ function listen(c){
 auth.onAuthStateChanged(function(u){
   if(!u){uid=null;stopListeners();booted=false;loadedC={};LG.hidden=false;document.body.classList.add("lg-on");return}
   uid=u.uid;LG.hidden=true;document.body.classList.remove("lg-on");$("lg-pass").value="";
-  $("btnOut").title="Sesión: "+(u.email||"");
   stopListeners();loadedC={};booted=false;
   ["activos","aportes","ahorros","config"].forEach(listen);
 });
