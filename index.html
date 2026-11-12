@@ -447,7 +447,40 @@ input.ap{font:inherit;font-family:var(--mono);font-size:13px;width:100%;min-widt
 }
 </style>
 
-<style>body{margin:0}[hidden]{display:none!important}</style>
+<style>body{margin:0}[hidden]{display:none!important}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);opacity:0}
+.drop{display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;padding:28px 16px;border:2px dashed var(--line2);border-radius:14px;background:var(--wash);cursor:pointer;position:relative;color:var(--ink2);transition:border-color .12s,background .12s}
+.drop:hover,.drop.over,.drop:focus-within{border-color:var(--accent);background:var(--cat)}
+.drop svg{width:38px;height:38px;fill:none;stroke:var(--accent);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.drop b{color:var(--ink);font-size:16px}
+.drop span{font-size:13px}
+.drop .fmts{display:flex;gap:6px;margin-top:4px}
+.drop .fmts i{font-style:normal;font:700 12px var(--mono);padding:3px 9px;border-radius:999px;background:var(--surface);border:1px solid var(--line2);color:var(--ink)}
+.imfile{display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:var(--wash)}
+.imfile>div{flex:1;min-width:0}
+.imfile b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.imfile small{color:var(--muted);font-size:12px}
+.imico{width:40px;height:40px;flex:none;border-radius:10px;background:var(--cat);color:var(--catink);display:inline-flex;align-items:center;justify-content:center}
+.imico svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.imsum{display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:8px}
+.imstat{padding:10px 12px;border-radius:10px;background:var(--wash);display:flex;flex-direction:column;gap:2px}
+.imstat b{font-size:20px;font-weight:800;font-variant-numeric:tabular-nums}
+.imstat span{font-size:12px;color:var(--muted);font-weight:600}
+.imlist{border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.imrow{display:flex;justify-content:space-between;gap:10px;padding:8px 12px;border-bottom:1px solid var(--line);font-size:13px}
+.imrow:last-child{border-bottom:none}
+.imrow .n{font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.imrow .m{color:var(--ink2);font-variant-numeric:tabular-nums;white-space:nowrap}
+.imtag{margin-left:8px;font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px}
+.imtag.new{background:color-mix(in srgb,var(--pos) 14%,transparent);color:var(--pos)}
+.modes{display:flex;flex-direction:column;gap:8px}
+.mode{display:flex;gap:12px;align-items:flex-start;padding:12px 14px;border:1.5px solid var(--line2);border-radius:12px;cursor:pointer}
+.mode.on{border-color:var(--accent);background:var(--cat)}
+.mode.warn.on{border-color:var(--neg);background:color-mix(in srgb,var(--neg) 8%,transparent)}
+.mode input{margin-top:3px;width:18px;height:18px;flex:none;accent-color:var(--accent)}
+.mode b{display:block;font-size:14px}
+.mode small{display:block;color:var(--ink2);font-size:12px;margin-top:2px;line-height:1.35}
+</style>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
@@ -1725,7 +1758,8 @@ document.addEventListener("click",function(e){
   if(t.id==="d-save"){saveDolar();return}
   if(t.id==="d-auto"){autoDolar();return}
   if(t.id==="a-save"){saveActivos();return}
-  if(t.id==="rs-go"){doRestore();return}
+  if(t.id==="rs-go"){doImport();return}
+  if(t.closest("[data-imclear]")){openRestore();return}
   if((b=t.closest("#nav button,#tabs button"))){setView(b.dataset.view);return}
   if((b=t.closest("[data-mmove]"))){
     var mm=mvIndex(model())+Number(b.dataset.mmove);
@@ -1895,10 +1929,89 @@ function backup(){
   var d=new Date(),f=d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());
   saveFile("inversiones-copia-"+f+".json",JSON.stringify({version:2,exportado:d.toISOString(),activos:store.activos,aportesPorAnio:store.aportesPorAnio,dolar:store.dolar||null,meta:store.meta||null,ahorros:store.ahorros||{}},null,1),"application/json");
 }
-function openRestore(){
-  var h=sheetHead("Cargar copia de seguridad","Elegí un archivo .json que hayas descargado con «Copia de seguridad». Reemplaza los datos que tenés ahora en este navegador, de todos los años.");
-  h+='<label class="field">Archivo<input id="rs-file" type="file" accept=".json,application/json"></label><div class="msg" id="rs-msg" role="alert"></div><div class="btns"><button class="btn" type="button" data-close>Cancelar</button><button class="btn primary" type="button" id="rs-go">Reemplazar mis datos</button></div>';
-  openSheet(h);
+/* ---------- importar datos (.json, .csv, .xlsx) ---------- */
+var imp=null,impMode="sum",impSure=false,impYear=YEAR;
+var IMES=["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
+function normTxt(s){return String(s==null?"":s).normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/\s+/g," ").trim()}
+function monthIdx(v){
+  if(typeof v!=="string")return -1;
+  var s=normTxt(v).replace(/\.$/,"");
+  if(!s||s.length>12)return -1;
+  var k=s.slice(0,3);if(k==="set")k="sep";
+  var i=IMES.indexOf(k);if(i<0)return -1;
+  if(normTxt(MES[i]).indexOf(s)!==0&&!(i===8&&s.indexOf("set")===0))return -1;
+  return i;
+}
+function catOf(name){
+  var s=normTxt(name);
+  if(s==="acciones"||s==="accion")return "acciones";
+  if(s==="cedears"||s==="cedear")return "cedears";
+  if(s==="fondos"||s==="fondos de inversion"||s==="fondo de inversion"||s==="fci"||s==="fondos comunes de inversion")return "fondos";
+  return null;
+}
+function cellNum(v){
+  if(v==null||v==="")return null;
+  if(typeof v==="number")return isFinite(v)?v:null;
+  var n=parseNum(v);return (n==null||!isFinite(n))?null:n;
+}
+function findByName(act,name){
+  var k=normTxt(name);
+  for(var id in act){if(normTxt(act[id].nombre)===k)return id}
+  return null;
+}
+/* Una tabla: activos en filas, meses en columnas */
+function parseGrid(rows){
+  var hr=-1,cols=null,i,j;
+  for(i=0;i<rows.length&&i<20;i++){
+    var r=rows[i]||[],c={},n=0;
+    for(j=0;j<r.length;j++){var mi=monthIdx(r[j]);if(mi>=0&&!(mi in c)){c[mi]=j;n++}}
+    if(n>=6){hr=i;cols=c;break}
+  }
+  if(hr<0)return null;
+  var cat=catOf(rows[hr][0])||"acciones",assets=[],aportes=null,afterTot=false;
+  for(i=hr+1;i<rows.length;i++){
+    var r2=rows[i]||[],nm=r2[0]==null?"":String(r2[0]).trim();
+    if(!nm)continue;
+    var cc=catOf(nm);
+    if(cc){cat=cc;afterTot=false;continue}
+    var ns=normTxt(nm),vals=[],any=false;
+    for(var m=0;m<12;m++){var v=(m in cols)?cellNum(r2[cols[m]]):null;vals.push(v);if(v!=null)any=true}
+    if(/^(aporte|pusiste|puse)/.test(ns)){aportes=vals;continue}
+    if(/^(total|ganancia|rendimiento|rindieron|diferencia|variacion)/.test(ns)){afterTot=true;continue}
+    if(afterTot)continue;
+    assets.push({nombre:nm,cat:cat,vals:vals,any:any});
+  }
+  if(!assets.length&&!aportes)return null;
+  return {assets:assets,aportes:aportes};
+}
+function parseCsv(text){
+  text=text.replace(/^\uFEFF/,"");
+  var first=text.split(/\r?\n/,1)[0]||"",sep=";",best=-1;
+  [";","\t",","].forEach(function(ch){var c=first.split(ch).length-1;if(c>best){best=c;sep=ch}});
+  var rows=[],row=[],cur="",q=false,i,ch;
+  for(i=0;i<text.length;i++){
+    ch=text.charAt(i);
+    if(q){if(ch==='"'){if(text.charAt(i+1)==='"'){cur+='"';i++}else q=false}else cur+=ch}
+    else if(ch==='"')q=true;
+    else if(ch===sep){row.push(cur);cur=""}
+    else if(ch==="\n"||ch==="\r"){if(ch==="\r"&&text.charAt(i+1)==="\n")i++;row.push(cur);rows.push(row);row=[];cur=""}
+    else cur+=ch;
+  }
+  if(cur!==""||row.length){row.push(cur);rows.push(row)}
+  return rows;
+}
+function decodeText(buf){
+  try{return new TextDecoder("utf-8",{fatal:true}).decode(buf)}catch(e){return new TextDecoder("windows-1252").decode(buf)}
+}
+function loadXlsx(){
+  return new Promise(function(res,rej){
+    if(window.XLSX)return res(window.XLSX);
+    var s=document.createElement("script");
+    s.src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";
+    s.onload=function(){window.XLSX?res(window.XLSX):rej(new Error("x"))};
+    s.onerror=function(){rej(new Error("x"))};
+    document.head.appendChild(s);
+  });
 }
 function validBackup(o){
   if(!o||typeof o!=="object"||!o.activos||typeof o.activos!=="object")return false;
@@ -1907,25 +2020,224 @@ function validBackup(o){
     return a&&typeof a.nombre==="string"&&CATS.some(function(c){return c[0]===a.categoria})&&Array.isArray(a.lecturas)&&a.lecturas.every(function(r){return r&&typeof r.f==="string"&&typeof r.v==="number"});
   });
 }
-function doRestore(){
-  var f=$("rs-file").files[0],msg=$("rs-msg");
-  if(!f){msg.textContent="Elegí un archivo primero.";return}
-  var rd=new FileReader();
-  rd.onload=function(){
-    var o;try{o=JSON.parse(rd.result)}catch(e){msg.textContent="El archivo no se puede leer.";return}
-    if(!validBackup(o)){msg.textContent="Ese archivo no es una copia de esta app.";return}
-    var ap=o.aportesPorAnio&&typeof o.aportesPorAnio==="object"?o.aportesPorAnio:(o.aportes?{"2026":o.aportes}:{});
-    store={activos:o.activos,aportesPorAnio:ap,dolar:(o.dolar&&typeof o.dolar.valor==="number")?o.dolar:null,meta:(o.meta&&typeof o.meta==="object")?o.meta:null,ahorros:(o.ahorros&&typeof o.ahorros==="object")?o.ahorros:{}};
-    state.ahorros=clone(store.ahorros);
-    state.apAll=store.aportesPorAnio;
-    persist();
-    state.activos=clone(store.activos);
-    state.aportes={m:{},inicio:null};
-    watchAportes();watchDolar();watchAhorros();renderAll(true);closeSheet();toast("Copia cargada");
-  };
-  rd.onerror=function(){msg.textContent="No se pudo leer el archivo."};
-  rd.readAsText(f);
+function fsize(b){return b<1024?b+" B":b<1048576?nf0.format(b/1024)+" KB":nf1.format(b/1048576)+" MB"}
+function partYear(p){return p.y||impYear}
+function showImpErr(t){var m=$("rs-msg");if(m)m.textContent=t;var f=$("im-file");if(f)f.value=""}
+
+function openRestore(){
+  imp=null;impSure=false;impMode="sum";impYear=YEAR;
+  var h=sheetHead("Importar datos","Traé tus inversiones desde un archivo.");
+  h+='<label class="drop" id="im-drop" for="im-file"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg><b>Elegí un archivo o arrastralo acá</b><span>Excel, CSV o copia de seguridad</span><span class="fmts"><i>.xlsx</i><i>.csv</i><i>.json</i></span><input class="sr" id="im-file" type="file" accept=".xlsx,.xls,.xlsm,.ods,.csv,.tsv,.txt,.json,application/json,text/csv"></label>';
+  h+='<p class="hint">Para Excel y CSV uso el mismo formato que «Exportar CSV»: un activo por fila y los meses (Enero a Diciembre) en columnas. Si el Excel tiene una hoja por año (2024, 2025…), cada una se carga en su año. Antes de guardar vas a ver una vista previa.</p>';
+  h+='<div class="msg" id="rs-msg" role="alert"></div><div class="btns"><button class="btn" type="button" data-close>Cancelar</button></div>';
+  openSheet(h);
 }
+function readImport(file){
+  var name=file.name||"archivo",ext=(name.split(".").pop()||"").toLowerCase(),msg=$("rs-msg");
+  if(msg)msg.textContent="Leyendo…";
+  function finishTab(parts,label){
+    if(!parts.length){showImpErr("No encontré una tabla con los meses (Enero a Diciembre). Usá el mismo formato que «Exportar CSV»: activos en filas y meses en columnas.");return}
+    imp={kind:"tab",name:name,size:file.size,label:label,parts:parts};
+    impMode="sum";impSure=false;impYear=YEAR;renderImport();
+  }
+  var rd=new FileReader();
+  rd.onerror=function(){showImpErr("No se pudo leer el archivo.")};
+  rd.onload=function(){
+    var buf=rd.result;
+    try{
+      if(ext==="json"){
+        var o;try{o=JSON.parse(decodeText(buf))}catch(e){showImpErr("El archivo no se puede leer como copia de seguridad.");return}
+        if(!validBackup(o)){showImpErr("Ese .json no es una copia de esta app.");return}
+        imp={kind:"json",name:name,size:file.size,label:"Copia de seguridad",json:o};
+        impMode="sum";impSure=false;renderImport();return;
+      }
+      if(/^(xlsx|xls|xlsm|xlsb|ods)$/.test(ext)){
+        loadXlsx().then(function(X){
+          var wb=X.read(buf,{type:"array"}),parts=[];
+          wb.SheetNames.forEach(function(sn){
+            var res=parseGrid(X.utils.sheet_to_json(wb.Sheets[sn],{header:1,raw:true,defval:null}));
+            var ym=String(sn).match(/(20\d\d)/);
+            if(res)parts.push({label:sn,y:ym?Number(ym[1]):null,res:res});
+          });
+          finishTab(parts,"Excel · "+wb.SheetNames.length+(wb.SheetNames.length===1?" hoja":" hojas"));
+        }).catch(function(){showImpErr("No pude leer el Excel. Revisá que tengas internet o guardalo como .csv.")});
+        return;
+      }
+      var res2=parseGrid(parseCsv(decodeText(buf)));
+      finishTab(res2?[{label:name,y:null,res:res2}]:[],"CSV");
+    }catch(e){showImpErr("No pude leer ese archivo.")}
+  };
+  rd.readAsArrayBuffer(file);
+}
+function tabSummary(){
+  var s={years:{},assets:0,nuevos:0,meses:{},aportes:0,rows:[]};
+  imp.parts.forEach(function(p){
+    var y=partYear(p);s.years[y]=1;
+    p.res.assets.forEach(function(it){
+      s.assets++;
+      var ex=!!findByName(state.activos,it.nombre);if(!ex)s.nuevos++;
+      var n=0,last=null;
+      it.vals.forEach(function(v,m){if(v!=null){n++;last=v;s.meses[y+"-"+m]=1}});
+      s.rows.push({n:it.nombre,y:y,ex:ex,k:n,last:last});
+    });
+    if(p.res.aportes)p.res.aportes.forEach(function(v){if(v!=null)s.aportes++});
+  });
+  return s;
+}
+function jsonSummary(o){
+  var ys={},nuevos=0,ap=o.aportesPorAnio&&typeof o.aportesPorAnio==="object"?o.aportesPorAnio:{};
+  Object.keys(o.activos).forEach(function(id){
+    var a=o.activos[id];
+    if(!state.activos[id]&&!findByName(state.activos,a.nombre))nuevos++;
+    (a.lecturas||[]).forEach(function(r){ys[r.f.slice(0,4)]=1});
+    (a.anios||[]).forEach(function(y){ys[y]=1});
+  });
+  Object.keys(ap).forEach(function(y){ys[y]=1});
+  var yl=Object.keys(ys).sort();
+  return {activos:Object.keys(o.activos).length,nuevos:nuevos,ahorros:o.ahorros&&typeof o.ahorros==="object"?Object.keys(o.ahorros).length:0,anios:yl.length?(yl.length===1?yl[0]:yl[0]+"–"+yl[yl.length-1]):"—"};
+}
+function statHTML(v,l){return '<div class="imstat"><b>'+esc(String(v))+'</b><span>'+esc(l)+'</span></div>'}
+function renderImport(){
+  if(!imp)return;
+  var ico='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg>';
+  var h=sheetHead("Importar datos","Revisá lo que encontré antes de guardarlo.");
+  h+='<div class="imfile"><span class="imico">'+ico+'</span><div><b>'+esc(imp.name)+'</b><small>'+esc(imp.label)+' · '+fsize(imp.size)+'</small></div><button class="mini" type="button" data-imclear>Cambiar</button></div>';
+  var repT,repD;
+  if(imp.kind==="json"){
+    var j=jsonSummary(imp.json);
+    h+='<div class="imsum">'+statHTML(j.activos,"Activos")+statHTML(j.nuevos,"Nuevos")+statHTML(j.ahorros,"Ahorros")+statHTML(j.anios,"Años")+'</div>';
+    repT="Reemplazar todo";repD="Borra lo que tenés ahora y deja solo lo del archivo.";
+  }else{
+    if(imp.parts.some(function(p){return !p.y})){
+      h+='<label class="field">¿De qué año son estos valores?<select id="im-year">'+yearList().map(function(y){return '<option value="'+y+'"'+(y===impYear?" selected":"")+'>'+y+'</option>'}).join("")+'</select></label>';
+    }
+    var s=tabSummary(),yrs=Object.keys(s.years).sort(),multi=yrs.length>1;
+    h+='<div class="imsum">'+statHTML(s.assets,"Activos")+statHTML(s.nuevos,"Nuevos")+statHTML(Object.keys(s.meses).length,"Meses con valores")+(s.aportes?statHTML(s.aportes,"Aportes"):"")+'</div>';
+    if(s.rows.length){
+      h+='<div class="imlist">';
+      s.rows.slice(0,8).forEach(function(r){
+        h+='<div class="imrow"><span class="n">'+esc(r.n)+(r.ex?"":'<span class="imtag new">Nuevo</span>')+'</span><span class="m">'+(multi?r.y+" · ":"")+r.k+(r.k===1?" mes":" meses")+(r.last!=null?" · "+money0(r.last):"")+'</span></div>';
+      });
+      if(s.rows.length>8)h+='<div class="imrow"><span class="m">y '+(s.rows.length-8)+' más…</span></div>';
+      h+='</div>';
+    }
+    repT="Reemplazar "+(yrs.length===1?"el año ":"los años ")+yrs.join(", ");
+    repD="Borra lo cargado en "+(yrs.length===1?"ese año":"esos años")+" y deja lo del archivo. Los demás años no se tocan.";
+  }
+  var sum=impMode==="sum";
+  h+='<div class="modes"><label class="mode'+(sum?" on":"")+'"><input type="radio" name="im-mode" value="sum"'+(sum?" checked":"")+'><span><b>Sumar a lo que ya tengo (recomendado)</b><small>Agrega lo nuevo y actualiza los meses que coinciden. No borra nada.</small></span></label>';
+  h+='<label class="mode warn'+(sum?"":" on")+'"><input type="radio" name="im-mode" value="rep"'+(sum?"":" checked")+'><span><b>'+esc(repT)+'</b><small>'+esc(repD)+'</small></span></label></div>';
+  h+='<div class="msg" id="rs-msg" role="alert"></div><div class="btns"><button class="btn" type="button" data-close>Cancelar</button><button class="btn primary" type="button" id="rs-go">'+(sum?"Importar":"Reemplazar")+'</button></div>';
+  $("sheet").innerHTML=h;
+}
+function buildFromJson(o,mode){
+  var ap=o.aportesPorAnio&&typeof o.aportesPorAnio==="object"?o.aportesPorAnio:(o.aportes?{"2026":o.aportes}:{});
+  var inc={activos:clone(o.activos),aportesPorAnio:clone(ap),dolar:(o.dolar&&typeof o.dolar.valor==="number")?clone(o.dolar):null,meta:(o.meta&&typeof o.meta==="object")?clone(o.meta):null,ahorros:(o.ahorros&&typeof o.ahorros==="object")?clone(o.ahorros):{}};
+  if(mode==="rep")return inc;
+  var ns=clone(store);
+  ns.activos=ns.activos||{};ns.aportesPorAnio=ns.aportesPorAnio||{};ns.ahorros=ns.ahorros||{};
+  Object.keys(inc.activos).forEach(function(id){
+    var a=inc.activos[id],eid=ns.activos[id]?id:findByName(ns.activos,a.nombre);
+    if(!eid){ns.activos[id]=a;return}
+    var e=ns.activos[eid],map={};
+    (e.lecturas||[]).forEach(function(r){map[r.f]=r.v});
+    (a.lecturas||[]).forEach(function(r){map[r.f]=r.v});
+    e.lecturas=Object.keys(map).sort().map(function(f){return {f:f,v:map[f]}});
+    var ys={};(e.anios||[]).concat(a.anios||[]).forEach(function(y){ys[y]=1});
+    e.anios=Object.keys(ys).map(Number).sort(byNum);
+  });
+  Object.keys(inc.aportesPorAnio).forEach(function(y){
+    var src=inc.aportesPorAnio[y]||{},dst=ns.aportesPorAnio[y]||(ns.aportesPorAnio[y]={m:{},inicio:null});
+    dst.m=dst.m||{};
+    Object.keys(src.m||{}).forEach(function(k){dst.m[k]=src.m[k]});
+    if(typeof dst.inicio!=="number"&&typeof src.inicio==="number")dst.inicio=src.inicio;
+  });
+  Object.keys(inc.ahorros).forEach(function(id){if(!ns.ahorros[id])ns.ahorros[id]=inc.ahorros[id]});
+  if(!ns.dolar&&inc.dolar)ns.dolar=inc.dolar;
+  if(!ns.meta&&inc.meta)ns.meta=inc.meta;
+  return ns;
+}
+function buildFromTab(parts,mode){
+  var ns=clone(store),dn=new Date(),cy=dn.getFullYear(),cm=dn.getMonth(),years={};
+  ns.activos=ns.activos||{};ns.aportesPorAnio=ns.aportesPorAnio||{};
+  parts.forEach(function(p){years[partYear(p)]=1});
+  if(mode==="rep"){
+    Object.keys(years).forEach(function(y){
+      Object.keys(ns.activos).forEach(function(id){
+        var a=ns.activos[id];
+        a.lecturas=(a.lecturas||[]).filter(function(r){return r.f.indexOf(y+"-")!==0});
+        a.anios=(a.anios||[]).filter(function(x){return String(x)!==y});
+      });
+      var old=ns.aportesPorAnio[y];
+      ns.aportesPorAnio[y]={m:{},inicio:old&&typeof old.inicio==="number"?old.inicio:null};
+    });
+  }
+  parts.forEach(function(p){
+    var y=partYear(p);
+    p.res.assets.forEach(function(it){
+      var id=findByName(ns.activos,it.nombre),a;
+      if(id)a=ns.activos[id];
+      else{
+        var base=slug(it.nombre),k=2;id=base;
+        while(ns.activos[id])id=base+"-"+(k++);
+        var ord=0;Object.keys(ns.activos).forEach(function(i){var x=ns.activos[i];if(x.categoria===it.cat&&(x.orden||0)>ord)ord=x.orden});
+        a=ns.activos[id]={nombre:it.nombre,categoria:it.cat,orden:ord+1,lecturas:[],anios:[]};
+      }
+      a.lecturas=a.lecturas||[];
+      it.vals.forEach(function(v,m){
+        if(v==null)return;
+        var pre=y+"-"+pad(m+1);
+        a.lecturas=a.lecturas.filter(function(r){return r.f.indexOf(pre)!==0});
+        a.lecturas.push({f:(y===cy&&m===cm)?realToday():pre+"-"+pad(new Date(y,m+1,0).getDate()),v:v});
+      });
+      a.lecturas.sort(function(x,z){return x.f<z.f?-1:x.f>z.f?1:0});
+      if((a.anios||[]).indexOf(y)<0)a.anios=(a.anios||[]).concat([y]).sort(byNum);
+    });
+    if(p.res.aportes){
+      var d=ns.aportesPorAnio[y]||(ns.aportesPorAnio[y]={m:{},inicio:null});
+      d.m=d.m||{};
+      p.res.aportes.forEach(function(v,m){if(v!=null)d.m[pad(m+1)]=v});
+    }
+  });
+  return ns;
+}
+function applyStore(ns){
+  ["activos","aportes","ahorros"].forEach(function(c){
+    var old=store[COLS[c]]||{};
+    Object.keys(old).forEach(function(id){cloudIds[c][id]=1});
+  });
+  store=ns;
+  state.activos=clone(ns.activos);state.ahorros=clone(ns.ahorros||{});state.apAll=ns.aportesPorAnio;
+  persist();syncAp();renderAll(true);
+}
+function doImport(){
+  if(!imp)return;
+  if(impMode==="rep"&&!impSure){
+    impSure=true;
+    var b=$("rs-go");b.textContent="Tocá otra vez para reemplazar";
+    b.style.background="var(--neg)";b.style.borderColor="var(--neg)";b.style.color="#fff";
+    return;
+  }
+  var prev=clone(store),ns;
+  try{ns=imp.kind==="json"?buildFromJson(imp.json,impMode):buildFromTab(imp.parts,impMode)}
+  catch(e){var m=$("rs-msg");if(m)m.textContent="No se pudo importar ese archivo.";return}
+  applyStore(ns);
+  closeSheet();imp=null;
+  toastUndo("Datos importados",function(){applyStore(prev)});
+}
+document.addEventListener("change",function(e){
+  var t=e.target;
+  if(t.id==="im-file"){if(t.files&&t.files[0])readImport(t.files[0])}
+  else if(t.name==="im-mode"){impMode=t.value;impSure=false;renderImport()}
+  else if(t.id==="im-year"){impYear=Number(t.value);renderImport()}
+});
+document.addEventListener("dragover",function(e){var z=e.target.closest&&e.target.closest("#im-drop");if(z){e.preventDefault();z.classList.add("over")}});
+document.addEventListener("dragleave",function(e){var z=e.target.closest&&e.target.closest("#im-drop");if(z)z.classList.remove("over")});
+document.addEventListener("drop",function(e){
+  var z=e.target.closest&&e.target.closest("#im-drop");if(!z)return;
+  e.preventDefault();z.classList.remove("over");
+  var f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0];if(f)readImport(f);
+});
 
 /* ---------- arranque: los datos viven en tu cuenta (Firebase) ---------- */
 var FB_CONFIG={
