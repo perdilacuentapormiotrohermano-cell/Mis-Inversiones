@@ -2077,14 +2077,12 @@ function setItem(k,t,d,cls){return '<button type="button" class="setitem'+(cls?"
 function setSwitch(k,ico,t,d,on){return '<button type="button" class="setitem" role="switch" aria-checked="'+(on?"true":"false")+'" data-set="'+k+'"><span class="seti"><svg viewBox="0 0 24 24" aria-hidden="true">'+SETICO[ico]+'</svg></span><span class="sett"><b>'+t+'</b><small>'+d+'</small></span><span class="swt'+(on?" on":"")+'" aria-hidden="true"></span></button>'}
 function openAjustes(){
   var u=auth.currentUser,h=sheetHead("Ajustes","");
-  h+='<div class="setgrp"><div class="setlbl">Privacidad</div>'+setSwitch("hide",HIDE?"eyeoff":"eye","Ocultar montos","Tapa los números con \u2022\u2022\u2022\u2022 en esta pantalla. Para editar, volvé a mostrarlos.",HIDE)+'</div>';
   h+='<div class="setgrp"><div class="setlbl">Datos</div>'+setItem("imp","Importar datos","Desde Excel, CSV o una copia de seguridad")+setItem("csv","Exportar CSV","Descargá el año que estás viendo")+setItem("bak","Copia de seguridad","Descargá todos tus datos en un archivo")+'</div>';
   h+='<div class="setgrp"><div class="setlbl">Moneda</div>'+setItem("usd","Dólar","Elegí MEP, Oficial, Blue o CCL, o escribilo a mano")+'</div>';
   h+='<div class="setgrp setsep"><div class="setlbl">Cuenta</div>'+(u&&u.email?'<div class="setmail">'+esc(u.email)+'</div>':'')+setItem("out","Cerrar sesión","Salir en este dispositivo","danger")+'</div>';
   openSheet(h);
 }
 function runSet(k){
-  if(k==="hide"){setHide(!HIDE);openAjustes();return}
   if(k==="imp"){openRestore();return}
   if(k==="usd"){openDolar();return}
   closeSheet();
