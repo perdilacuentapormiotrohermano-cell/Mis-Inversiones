@@ -488,6 +488,8 @@ input.ap{font:inherit;font-family:var(--mono);font-size:13px;width:100%;min-widt
 .swt.on{background:var(--accent)}
 .swt.on::after{transform:translateX(18px)}
 body.hide .ap,body.hide #ini,body.hide .ce,body.hide .ai[data-f="tot"],body.hide .ai[data-f="meta"],body.hide .ai[data-f="gm"]{filter:blur(7px);pointer-events:none;user-select:none}
+.eyebtn{display:inline-flex;align-items:center;justify-content:center;padding-left:10px;padding-right:10px}
+.eyebtn svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .ahdr{display:flex;gap:8px;align-items:center}
 .gchart svg{display:block;width:100%;height:auto;margin-top:8px}
 .gchart text{font-family:var(--sans);fill:var(--ink2);font-size:11px}
@@ -782,7 +784,7 @@ function renderKpis(M){
   var d=p!=null?t-p:null;
   var h='';
   var dv=state.dolar.valor,inUsd=usd&&dv>0;
-  h+='<div class="kpi"><span class="k">Valor actual</span><span class="v">'+(inUsd?"US$ "+nf0.format(t/dv):money0(t))+'</span><span class="s">'+MES[L]+(inUsd?" · dólar "+(state.dolar.auto?casaName(state.dolar.casa)+" a $ ":"a $ ")+rf2.format(dv)+(state.dolar.fecha?" ("+fdate(state.dolar.fecha)+")":""):"")+'</span><div class="row"><button class="mini" id="btnUsd" type="button">'+(inUsd?"Ver en pesos":"Ver en dólares")+'</button>'+(inUsd?'<button class="mini" type="button" data-dolar>Dólar</button>':"")+'</div></div>';
+  h+='<div class="kpi"><span class="k">Valor actual</span><span class="v">'+(inUsd?"US$ "+nf0.format(t/dv):money0(t))+'</span><span class="s">'+MES[L]+(inUsd?" · dólar "+(state.dolar.auto?casaName(state.dolar.casa)+" a $ ":"a $ ")+rf2.format(dv)+(state.dolar.fecha?" ("+fdate(state.dolar.fecha)+")":""):"")+'</span><div class="row"><button class="mini" id="btnUsd" type="button">'+(inUsd?"Ver en pesos":"Ver en dólares")+'</button>'+'<button class="mini eyebtn" type="button" data-hidetoggle aria-pressed="'+(HIDE?"true":"false")+'" aria-label="'+(HIDE?"Mostrar montos":"Ocultar montos")+'" title="'+(HIDE?"Mostrar montos":"Ocultar montos")+'"><svg viewBox="0 0 24 24" aria-hidden="true">'+SETICO[HIDE?"eyeoff":"eye"]+'</svg></button>'+(inUsd?'<button class="mini" type="button" data-dolar>Dólar</button>':"")+'</div></div>';
   h+='<div class="kpi"><span class="k">Cambio vs '+(L>0?MES[L-1].toLowerCase():"mes anterior")+'</span><span class="v">'+(d==null?'<span class="dash">—</span>':deltaHTML(d,true))+'</span><span class="s">'+(d==null?"Sin datos del mes anterior":pctHTML(d/p*100))+'</span></div>';
   h+='<div class="kpi"><span class="k">Aportado en '+YEAR+'</span><span class="v">'+(hasAp?money0(apSum):'<span class="dash">Sin cargar</span>')+'</span><span class="s">'+(hasAp?"hasta "+MES[L].toLowerCase():"Cargalo en la fila «Pusiste este mes»")+'</span></div>';
   h+='<div class="kpi"><span class="k">Ganancia acumulada</span><span class="v">'+(from<0?'<span class="dash">—</span>':deltaHTML(gsum,true))+'</span><span class="s">'+(from<0?"Falta el valor de cierre de "+(YEAR-1):MES[from].toLowerCase()+" a "+MES[L].toLowerCase()+(hasAp?"":", sin descontar aportes"))+'</span></div>';
