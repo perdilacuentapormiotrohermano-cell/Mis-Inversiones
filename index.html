@@ -482,6 +482,15 @@ input.ap{font:inherit;font-family:var(--mono);font-size:13px;width:100%;min-widt
 
 .gearbtn{min-width:40px;padding:0 10px;display:inline-flex;align-items:center;justify-content:center}
 .gearbtn svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.soldtag{display:block;font-size:11px;font-weight:600;color:var(--muted);margin-top:1px}
+.swt{width:42px;height:24px;border-radius:999px;background:var(--line2);position:relative;flex:none;margin-left:auto;transition:background .15s}
+.swt::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.3);transition:transform .15s}
+.swt.on{background:var(--accent)}
+.swt.on::after{transform:translateX(18px)}
+body.hide .ap,body.hide #ini,body.hide .ce,body.hide .ai[data-f="tot"],body.hide .ai[data-f="meta"],body.hide .ai[data-f="gm"]{filter:blur(7px);pointer-events:none;user-select:none}
+.ahdr{display:flex;gap:8px;align-items:center}
+.gchart svg{display:block;width:100%;height:auto;margin-top:8px}
+.gchart text{font-family:var(--sans);fill:var(--ink2);font-size:11px}
 .setgrp{display:flex;flex-direction:column;gap:6px}
 .setgrp.setsep{margin-top:6px;padding-top:14px;border-top:1px solid var(--line)}
 .setlbl{font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
@@ -598,9 +607,14 @@ var CATS=[["acciones","Acciones"],["cedears","Cedears"],["fondos","Fondos de inv
 var $=function(id){return document.getElementById(id)};
 var state={activos:{},aportes:{m:{},inicio:null},apAll:{},meta:{monto:null,mes:11,anio:null},ahorros:{},dolar:{valor:null,fecha:null,auto:true,casa:"bolsa"},loaded:false,ready:false};
 var db=null,dl=null,tipIdx=-1;
-var nf0=new Intl.NumberFormat("es-AR",{maximumFractionDigits:0});
-var nf1=new Intl.NumberFormat("es-AR",{minimumFractionDigits:1,maximumFractionDigits:1});
-var nf2=new Intl.NumberFormat("es-AR",{maximumFractionDigits:2});
+var rf0=new Intl.NumberFormat("es-AR",{maximumFractionDigits:0});
+var rf1=new Intl.NumberFormat("es-AR",{minimumFractionDigits:1,maximumFractionDigits:1});
+var rf2=new Intl.NumberFormat("es-AR",{maximumFractionDigits:2});
+var HIDE=false;try{HIDE=localStorage.getItem("inv-hide")==="1"}catch(e){}
+function maskNf(r){return {format:function(v){return HIDE?"\u2022\u2022\u2022\u2022":r.format(v)}}}
+var nf0=maskNf(rf0),nf1=maskNf(rf1),nf2=maskNf(rf2);
+document.body.classList.toggle("hide",HIDE);
+function setHide(v){HIDE=!!v;document.body.classList.toggle("hide",HIDE);try{localStorage.setItem("inv-hide",HIDE?"1":"0")}catch(e){}renderAll(true)}
 var money0=function(v){return (v<0?"-$ ":"$ ")+nf0.format(Math.abs(v))};
 var money1=function(v){return (v<0?"-$ ":"$ ")+nf1.format(Math.abs(v))};
 var pad=function(n){return String(n).padStart(2,"0")};
@@ -640,13 +654,23 @@ function toast(t){
 }
 
 /* ---------- datos derivados ---------- */
+function soldIdx(a){
+  if(!a||!a.vendido)return null;
+  var q=String(a.vendido).split("-"),yy=Number(q[0]),mm=Number(q[1])-1;
+  return (isFinite(yy)&&isFinite(mm))?yy*12+mm:null;
+}
+function soldYear(a){var i=soldIdx(a);return i==null?null:Math.floor(i/12)}
+function heldIn(a,m,y){var i=soldIdx(a);return i==null||((y||YEAR)*12+m)<i}
+function soldLbl(a){var i=soldIdx(a);return i==null?"":MES[i%12].toLowerCase()+" "+Math.floor(i/12)}
+function soldTag(a){var l=soldLbl(a);return l?'<span class="soldtag">Vendido \u00b7 '+l+'</span>':""}
 function monthVal(a,m,y){
+  if(!heldIn(a,m,y))return null;
   var p=(y||YEAR)+"-"+pad(m+1),best=null,L=a.lecturas||[];
   for(var i=0;i<L.length;i++){if(L[i].f.indexOf(p)===0&&(!best||L[i].f>=best.f))best=L[i];}
   return best;
 }
 function hasReadings(a,y){var p=y+"-";return (a.lecturas||[]).some(function(r){return r.f.indexOf(p)===0})}
-function visibleIn(a,y){return (a.anios||[]).indexOf(y)>=0||hasReadings(a,y)}
+function visibleIn(a,y){var sy=soldYear(a);if(sy!=null&&y>sy)return false;return (a.anios||[]).indexOf(y)>=0||hasReadings(a,y)}
 function model(){
   var list=Object.keys(state.activos).map(function(id){var a=clone(state.activos[id]);a.id=id;return a}).filter(function(a){return visibleIn(a,YEAR)});
   var ci=function(c){var i=CATS.findIndex(function(x){return x[0]===c});return i<0?99:i};
@@ -728,8 +752,8 @@ function renderAll(force){
   if(isMobile()){$("tbl").innerHTML="";$("mview").innerHTML=mviewHTML(M)}else{$("tbl").innerHTML=tableHTML(M);$("mview").innerHTML=""}
   var ini=$("ini");
   if(ini){
-    if(document.activeElement!==ini)ini.value=M.iniSet==null?"":nf2.format(M.iniSet);
-    ini.placeholder=M.iniAuto==null?"0":nf2.format(M.iniAuto);
+    if(document.activeElement!==ini)ini.value=M.iniSet==null?"":rf2.format(M.iniSet);
+    ini.placeholder=M.iniAuto==null?"0":rf2.format(M.iniAuto);
   }
   $("iniLbl").textContent="Valor al cierre de "+(YEAR-1)+" (opcional"+(M.iniAuto!=null?"; si lo dejás vacío uso el último valor que cargaste en "+(YEAR-1):"")+")";
   renderComp(M);renderEvo();renderYears();renderAvisos();renderAhorros();renderAhome();renderAhSide();
@@ -746,7 +770,7 @@ function deltaHTML(v,withMoney){
 }
 function pctHTML(v){
   if(v==null||!isFinite(v))return "";
-  return (v>0?"+":v<0?"-":"")+nf1.format(Math.abs(v))+" %";
+  return (v>0?"+":v<0?"-":"")+rf1.format(Math.abs(v))+" %";
 }
 function renderKpis(M){
   if(!state.loaded||M.latest<0){$("kpis").innerHTML="";return}
@@ -758,7 +782,7 @@ function renderKpis(M){
   var d=p!=null?t-p:null;
   var h='';
   var dv=state.dolar.valor,inUsd=usd&&dv>0;
-  h+='<div class="kpi"><span class="k">Valor actual</span><span class="v">'+(inUsd?"US$ "+nf0.format(t/dv):money0(t))+'</span><span class="s">'+MES[L]+(inUsd?" · dólar "+(state.dolar.auto?casaName(state.dolar.casa)+" a $ ":"a $ ")+nf2.format(dv)+(state.dolar.fecha?" ("+fdate(state.dolar.fecha)+")":""):"")+'</span><div class="row"><button class="mini" id="btnUsd" type="button">'+(inUsd?"Ver en pesos":"Ver en dólares")+'</button>'+(inUsd?'<button class="mini" type="button" data-dolar>Dólar</button>':"")+'</div></div>';
+  h+='<div class="kpi"><span class="k">Valor actual</span><span class="v">'+(inUsd?"US$ "+nf0.format(t/dv):money0(t))+'</span><span class="s">'+MES[L]+(inUsd?" · dólar "+(state.dolar.auto?casaName(state.dolar.casa)+" a $ ":"a $ ")+rf2.format(dv)+(state.dolar.fecha?" ("+fdate(state.dolar.fecha)+")":""):"")+'</span><div class="row"><button class="mini" id="btnUsd" type="button">'+(inUsd?"Ver en pesos":"Ver en dólares")+'</button>'+(inUsd?'<button class="mini" type="button" data-dolar>Dólar</button>':"")+'</div></div>';
   h+='<div class="kpi"><span class="k">Cambio vs '+(L>0?MES[L-1].toLowerCase():"mes anterior")+'</span><span class="v">'+(d==null?'<span class="dash">—</span>':deltaHTML(d,true))+'</span><span class="s">'+(d==null?"Sin datos del mes anterior":pctHTML(d/p*100))+'</span></div>';
   h+='<div class="kpi"><span class="k">Aportado en '+YEAR+'</span><span class="v">'+(hasAp?money0(apSum):'<span class="dash">Sin cargar</span>')+'</span><span class="s">'+(hasAp?"hasta "+MES[L].toLowerCase():"Cargalo en la fila «Pusiste este mes»")+'</span></div>';
   h+='<div class="kpi"><span class="k">Ganancia acumulada</span><span class="v">'+(from<0?'<span class="dash">—</span>':deltaHTML(gsum,true))+'</span><span class="s">'+(from<0?"Falta el valor de cierre de "+(YEAR-1):MES[from].toLowerCase()+" a "+MES[L].toLowerCase()+(hasAp?"":", sin descontar aportes"))+'</span></div>';
@@ -832,7 +856,10 @@ function chartMove(e){
 function chartLeave(){var t=$("tip"),x=$("xh");if(t)t.hidden=true;if(x)x.setAttribute("visibility","hidden")}
 
 function cellInner(r){return r?"$ "+nf1.format(r.v):'<span class="dash">—</span>'}
-function cellBtn(id,m,r){return '<button type="button" class="cellbtn" data-asset="'+esc(id)+'" data-m="'+m+'" title="'+(r?"Valor del "+fdate(r.f)+". Tocá para cambiarlo":"Tocá para escribir el valor")+'">'+cellInner(r)+'</button>'}
+function cellBtn(id,m,r){
+  var sa=state.activos[id];
+  if(sa&&!heldIn(sa,m,YEAR))return '<span class="dash" title="Ya lo vendiste">\u2014</span>';
+  return '<button type="button" class="cellbtn" data-asset="'+esc(id)+'" data-m="'+m+'" title="'+(r?"Valor del "+fdate(r.f)+". Tocá para cambiarlo":"Tocá para escribir el valor")+'">'+cellInner(r)+'</button>'}
 function emptyHTML(){
   var prev=Object.keys(state.activos).some(function(id){return visibleIn(state.activos[id],YEAR-1)});
   return '<div style="padding:16px;display:flex;flex-direction:column;gap:10px;align-items:flex-start"><p class="hint">Todavía no hay activos en '+YEAR+'.</p>'+(prev?'<button class="btn primary" type="button" data-copyprev>Usar los activos de '+(YEAR-1)+'</button>':'')+'<button class="btn" type="button" data-openact>Elegir activos</button></div>';
@@ -853,7 +880,7 @@ function tableHTML(M){
     M.cats[c[0]].forEach(function(v,m){h+='<td class="num'+(m===CUR?" cur":"")+'">'+(v==null?"":"$ "+nf0.format(v))+'</td>'});
     h+='</tr>';
     rows.forEach(function(a){
-      h+='<tr><th class="sticky"><button type="button" class="assetbtn" data-asset="'+esc(a.id)+'" title="Ver detalle y opciones">'+esc(a.nombre)+'</button></th>';
+      h+='<tr><th class="sticky"><button type="button" class="assetbtn" data-asset="'+esc(a.id)+'" title="Ver detalle y opciones">'+esc(a.nombre)+soldTag(a)+'</button></th>';
       for(var m=0;m<12;m++){
         var r=M.vals[a.id][m];
         h+='<td class="num'+(m===CUR?" cur":"")+'">'+cellBtn(a.id,m,r)+'</td>';
@@ -864,7 +891,7 @@ function tableHTML(M){
   h+='</tbody><tfoot>';
   h+='<tr class="gap"><th class="sticky"></th><td colspan="12"></td></tr>';
   h+='<tr><th class="sticky">Pusiste este mes'+qm("aporte")+'</th>';
-  for(var m=0;m<12;m++)h+='<td class="num'+(m===CUR?" cur":"")+'"><input class="ap" id="ap-'+pad(m+1)+'" data-m="'+m+'" inputmode="decimal" placeholder="$ 0" aria-label="Lo que pusiste en '+MES[m]+'" value="'+(M.ap[m]==null?"":nf2.format(M.ap[m]))+'"></td>';
+  for(var m=0;m<12;m++)h+='<td class="num'+(m===CUR?" cur":"")+'"><input class="ap" id="ap-'+pad(m+1)+'" data-m="'+m+'" inputmode="decimal" placeholder="$ 0" aria-label="Lo que pusiste en '+MES[m]+'" value="'+(M.ap[m]==null?"":rf2.format(M.ap[m]))+'"></td>';
   h+='</tr><tr><th class="sticky">Rindieron tus inversiones'+qm("ganancia")+'</th>';
   M.gains.forEach(function(g,m){h+='<td class="num'+(m===CUR?" cur":"")+'">'+deltaHTML(g,true)+'</td>'});
   h+='</tr><tr class="tot"><th class="sticky">Total del mes'+qm("total")+'</th>';
@@ -898,7 +925,7 @@ function renderComp(M){
   if(!state.loaded||M.latest<0){box.innerHTML="";return}
   var L=M.latest,tot=M.totals[L];
   var items=M.list.map(function(a){var r=M.vals[a.id][L];return r?{n:a.nombre,v:r.v}:null}).filter(Boolean).sort(function(x,y){return y.v-x.v});
-  var cs=CATS.map(function(c){var v=M.cats[c[0]][L];return v?c[1]+" "+nf1.format(v/tot*100)+" %":null}).filter(Boolean).join(" · ");
+  var cs=CATS.map(function(c){var v=M.cats[c[0]][L];return v?c[1]+" "+rf1.format(v/tot*100)+" %":null}).filter(Boolean).join(" · ");
   if(items.length>8){
     var rest=items.slice(7),sum=0;rest.forEach(function(x){sum+=x.v});
     items=items.slice(0,7);items.push({n:"Otros ("+rest.length+")",v:sum,other:true});
@@ -913,7 +940,7 @@ function renderComp(M){
       d='M'+(cx+R*c(ang)).toFixed(2)+' '+(cy+R*s(ang)).toFixed(2)+'A'+R+' '+R+' 0 '+lg+' 1 '+(cx+R*c(a2)).toFixed(2)+' '+(cy+R*s(a2)).toFixed(2)+'L'+(cx+r*c(a2)).toFixed(2)+' '+(cy+r*s(a2)).toFixed(2)+'A'+r+' '+r+' 0 '+lg+' 0 '+(cx+r*c(ang)).toFixed(2)+' '+(cy+r*s(ang)).toFixed(2)+'Z';
       ang=a2;
     }
-    var pc=nf1.format(f*100)+" % · "+money0(x.v);
+    var pc=rf1.format(f*100)+" % · "+money0(x.v);
     paths+='<path d="'+d+'" fill="'+col+'" fill-rule="evenodd" stroke="var(--surface)" stroke-width="2" data-i="'+i+'"><title>'+esc(x.n)+": "+pc+'</title></path>';
     leg+='<li data-i="'+i+'"><i style="background:'+col+'"></i><span class="n">'+esc(x.n)+'</span><span class="p">'+pc+'</span></li>';
   });
@@ -1033,7 +1060,7 @@ function missingNames(y,m){
   var out=[];
   Object.keys(state.activos).forEach(function(id){
     var a=state.activos[id];
-    if(!visibleIn(a,y)||monthVal(a,m,y))return;
+    if(!visibleIn(a,y)||!heldIn(a,m,y)||monthVal(a,m,y))return;
     var pp=m===0?(y-1)+"-12":y+"-"+pad(m);
     var recent=(a.lecturas||[]).some(function(r){return r.f.indexOf(pp)===0});
     if(recent)out.push(a.nombre);
@@ -1086,7 +1113,7 @@ function goAviso(i){
 
 function pctCell(p){
   if(p==null||!isFinite(p))return '<span class="dash">—</span>';
-  return '<span class="'+(p>0?"pos":p<0?"neg":"")+'">'+(p>0?"▲ ":p<0?"▼ ":"")+nf1.format(Math.abs(p))+" %</span>";
+  return '<span class="'+(p>0?"pos":p<0?"neg":"")+'">'+(p>0?"▲ ":p<0?"▼ ":"")+rf1.format(Math.abs(p))+" %</span>";
 }
 function renderYears(){
   var box=$("years");if(!box)return;
@@ -1139,7 +1166,7 @@ function mviewHTML(M){
   var v=M.totals[m],p=m===0?M.ini:M.totals[m-1],tri="";
   if(v!=null&&p!=null)tri=v>p?'<span class="pos">▲</span> ':v<p?'<span class="neg">▼</span> ':'';
   h+='<div class="mtot"><span>Total del mes'+qm("total")+'</span><b>'+(v==null?'<span class="dash">—</span>':tri+"$ "+nf0.format(v))+'</b></div>';
-  h+='<div class="mline"><span>Pusiste este mes'+qm("aporte")+'</span><input class="ap" id="ap-'+pad(m+1)+'" data-m="'+m+'" inputmode="decimal" placeholder="$ 0" aria-label="Lo que pusiste en '+MES[m]+'" value="'+(M.ap[m]==null?"":nf2.format(M.ap[m]))+'"></div>';
+  h+='<div class="mline"><span>Pusiste este mes'+qm("aporte")+'</span><input class="ap" id="ap-'+pad(m+1)+'" data-m="'+m+'" inputmode="decimal" placeholder="$ 0" aria-label="Lo que pusiste en '+MES[m]+'" value="'+(M.ap[m]==null?"":rf2.format(M.ap[m]))+'"></div>';
   h+='<div class="mline"><span>Rindieron tus inversiones'+qm("ganancia")+'</span><span class="mg">'+deltaHTML(M.gains[m],true)+'</span></div>';
   CATS.forEach(function(c){
     var rows=M.list.filter(function(a){return a.categoria===c[0]});
@@ -1147,7 +1174,7 @@ function mviewHTML(M){
     var sub=M.cats[c[0]][m];
     h+='<div class="mcat"><span>'+c[1]+'</span><span>'+(sub==null?"":"$ "+nf0.format(sub))+'</span></div>';
     rows.forEach(function(a){
-      h+='<div class="mrow"><button type="button" class="assetbtn mn" data-asset="'+esc(a.id)+'" title="Cambiar nombre o tipo">'+esc(a.nombre)+'</button><span class="mv">'+cellBtn(a.id,m,M.vals[a.id][m])+'</span></div>';
+      h+='<div class="mrow"><button type="button" class="assetbtn mn" data-asset="'+esc(a.id)+'" title="Cambiar nombre o tipo">'+esc(a.nombre)+soldTag(a)+'</button><span class="mv">'+cellBtn(a.id,m,M.vals[a.id][m])+'</span></div>';
     });
   });
   return h;
@@ -1227,8 +1254,8 @@ function catHTML(a,c){
   h+='<div class="acline"><span>'+ahMoney(s.ah,mon)+(hasMeta?' de '+ahMoney(c.meta,mon):'')+'</span><span>'+(s.gas>0?'Gastado '+ahMoney(s.gas,mon)+' · Disponible '+ahMoney(s.disp,mon):(hasMeta&&s.ah<c.meta?'Faltan '+ahMoney(c.meta-s.ah,mon):(hasMeta?'<b class="pos">✓ Meta cumplida</b>':'')))+'</span></div>';
   if(open){
     h+='<div class="abody">';
-    h+='<div class="arow3"><label class="field">Total ahorrado hasta ahora<input class="ai" data-f="tot" data-cat="'+esc(c.id)+'" inputmode="decimal" autocomplete="off" placeholder="$ 0" value="'+(s.ah?nf2.format(s.ah):"")+'"></label>';
-    h+='<label class="field">Meta<input class="ai" data-f="meta" data-cat="'+esc(c.id)+'" inputmode="decimal" autocomplete="off" placeholder="$ 0" value="'+(hasMeta?nf2.format(c.meta):"")+'"></label>';
+    h+='<div class="arow3"><label class="field">Total ahorrado hasta ahora<input class="ai" data-f="tot" data-cat="'+esc(c.id)+'" inputmode="decimal" autocomplete="off" placeholder="$ 0" value="'+(s.ah?rf2.format(s.ah):"")+'"></label>';
+    h+='<label class="field">Meta<input class="ai" data-f="meta" data-cat="'+esc(c.id)+'" inputmode="decimal" autocomplete="off" placeholder="$ 0" value="'+(hasMeta?rf2.format(c.meta):"")+'"></label>';
     h+='<label class="field">Nombre<input class="ai" data-f="cname" data-cat="'+esc(c.id)+'" maxlength="40" value="'+esc(c.nombre)+'"></label></div>';
     h+='<p class="hint">Escribí el total que tenés ahorrado y apretá Enter. La app anota la diferencia en el historial.</p>';
     h+='<div class="agasto"><label class="field">Anotar un gasto<input class="ai" data-f="gm" data-enter="gasto" inputmode="decimal" autocomplete="off" placeholder="Monto"></label><label class="field">Nota (opcional)<input class="ai" data-f="gn" data-enter="gasto" maxlength="60" placeholder="Ej.: pagué la reserva"></label><button class="btn" type="button" data-addgasto="'+esc(c.id)+'">Anotar gasto</button></div>';
@@ -1320,7 +1347,8 @@ function renderAhorros(){
   var L=ahList();
   if(ahSel&&!state.ahorros[ahSel])ahSel=null;
   if(ahMode==="detail"&&!ahSel&&!ahNew)ahMode="list";
-  var h='<div class="ahd"><h2>Mis ahorros</h2>'+(ahMode==="list"&&!ahNew&&L.length?'<button type="button" class="abtn-fill" data-ahnew>+ Crear ahorro</button>':'')+'</div>';
+  var eyeB='<button type="button" class="btn gearbtn" data-hidetoggle aria-pressed="'+(HIDE?"true":"false")+'" aria-label="'+(HIDE?"Mostrar montos":"Ocultar montos")+'" title="'+(HIDE?"Mostrar montos":"Ocultar montos")+'"><svg viewBox="0 0 24 24" aria-hidden="true">'+SETICO[HIDE?"eyeoff":"eye"]+'</svg></button>';
+  var h='<div class="ahd"><h2>Mis ahorros</h2><span class="ahdr">'+eyeB+(ahMode==="list"&&!ahNew&&L.length?'<button type="button" class="abtn-fill" data-ahnew>+ Crear ahorro</button>':'')+'</span></div>';
   if(!L.length&&!ahNew){
     h+='<p class="hint">Creá un ahorro por cada cosa que querés juntar, por ejemplo un viaje. Adentro armás categorías (hotel, comida, transporte…) y a cada una le ponés su meta.</p><div class="btns" style="justify-content:flex-start"><button class="abtn-fill" type="button" data-ahnew>Crear mi primer ahorro</button></div>';
     box.innerHTML=h;return;
@@ -1343,7 +1371,7 @@ function renderAhorros(){
   h='<button type="button" class="back" data-ahback>‹ Todos mis ahorros</button>'+h;
   h+='<div class="arow"><label class="field">Nombre<input class="ai" data-f="name" maxlength="60" value="'+esc(a.nombre)+'"></label><label class="field">Fecha para lograrlo<input class="ai" type="date" data-f="fecha" value="'+esc(a.fecha||"")+'"></label><label class="field">Moneda<select data-f="mon"><option value="ARS"'+(a.moneda!=="USD"?" selected":"")+'>Pesos ($)</option><option value="USD"'+(a.moneda==="USD"?" selected":"")+'>Dólares (US$)</option></select></label></div>';
   h+=a.archivado?'<p class="hint">Este ahorro está archivado, por eso no aparece en el inicio.</p>':'<label class="sw"><input type="checkbox" data-f="mostrar"'+(a.mostrar?" checked":"")+'><span>Mostrar en la pantalla inicial</span></label>';
-  h+=totalCardHTML(a);
+  h+=totalCardHTML(a)+growthHTML(a,box.clientWidth);
   h+='<div class="aacts"><button class="abtn" type="button" data-ahadd="'+esc(ahSel)+'">＋ Agregar plata</button><button class="abtn" type="button" data-ahgasto="'+esc(ahSel)+'">Anotar gasto</button></div>';
   h+='<div class="acats">';
   (a.cats||[]).forEach(function(c){h+=catHTML(a,c)});
@@ -1353,7 +1381,7 @@ function renderAhorros(){
     h+='<div class="aform"><div class="arow3"><label class="field">Categoría<input class="ai" id="ai-cn-name" data-enter="catcreate" maxlength="40" placeholder="Ej.: Hotel" value="'+esc(catDraft.n)+'"></label><label class="field">Meta<input class="ai" id="ai-cn-meta" data-enter="catcreate" inputmode="decimal" autocomplete="off" placeholder="$ 0" value="'+esc(catDraft.m)+'"></label><label class="field">Ya ahorrado (opcional)<input class="ai" id="ai-cn-tot" data-enter="catcreate" inputmode="decimal" autocomplete="off" placeholder="$ 0" value="'+esc(catDraft.t)+'"></label></div><div class="btns"><button class="btn" type="button" data-catcancel>Cancelar</button><button class="btn primary" type="button" data-catcreate>Agregar categoría</button></div></div>';
   }else h+='<div class="btns" style="justify-content:flex-start"><button class="btn" type="button" data-catadd>+ Categoría</button></div>';
   h+='<div class="hist-main">'+histHTML(a)+'</div>';
-  h+='<div class="adanger"><button class="mini arc" type="button" data-aharch="'+esc(ahSel)+'">'+(a.archivado?"Desarchivar este ahorro":"Archivar este ahorro")+'</button><button class="mini" type="button" data-ahdel>Eliminar este ahorro</button></div>';
+  h+='<div class="adanger"><button class="mini arc" type="button" data-ahdup="'+esc(ahSel)+'">Duplicar este ahorro</button><button class="mini arc" type="button" data-aharch="'+esc(ahSel)+'">'+(a.archivado?"Desarchivar este ahorro":"Archivar este ahorro")+'</button><button class="mini" type="button" data-ahdel>Eliminar este ahorro</button></div>';
   box.innerHTML=h;
 }
 function hcOpen(id){try{return !!JSON.parse(localStorage.getItem("inv-hcats")||"{}")[id]}catch(e){return !!hcMem[id]}}
@@ -1396,6 +1424,80 @@ function toastUndo(t,fn){
   el.innerHTML='<span></span> <button type="button" class="tundo" data-undo>Deshacer</button>';
   el.firstChild.textContent=t;el.hidden=false;
   clearTimeout(toast.t);toast.t=setTimeout(function(){el.hidden=true;undoFn=null},7000);
+}
+function dupAh(id){
+  var src=state.ahorros[id];if(!src)return;
+  var o=clone(src),orden=1,nid="a"+rid();
+  ahList().forEach(function(x){orden=Math.max(orden,(x.a.orden||0)+1)});
+  o.nombre=(src.nombre+" (copia)").slice(0,60);o.mostrar=false;delete o.archivado;o.orden=orden;
+  if(o.fecha&&o.fecha<=realToday())o.fecha=null;
+  (o.cats||[]).forEach(function(c,i){c.id="c"+rid()+i;c.mov=[]});
+  saveAh(nid,o);goAh(nid);ahHistAll=false;
+  setTimeout(function(){var f=document.querySelector('.ai[data-f="name"]');if(f){f.focus();f.select()}},80);
+  toastUndo("Duplicaste «"+src.nombre+"»: copié las categorías y metas, sin la plata ahorrada",function(){
+    delete state.ahorros[nid];if(ahSel===nid){ahSel=null;ahMode="list"}renderAll(true);
+    enqueue(function(){return db.doc("ahorros/"+nid).delete()});
+  });
+}
+function isoOfT(t){var d=new Date(t);return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate())}
+function ahShort(v,mon){
+  var p=mon==="USD"?"US$ ":"$ ",a=Math.abs(v);
+  if(a>=1e6)return p+nf1.format(v/1e6)+" M";
+  if(a>=1e3)return p+nf0.format(v/1e3)+" mil";
+  return p+nf0.format(v);
+}
+function growthHTML(a,bw){
+  var mon=a.moneda,T=ahTotals(a),ev=[];
+  (a.cats||[]).forEach(function(c){(c.mov||[]).forEach(function(m){if(m&&m.f&&typeof m.v==="number")ev.push(m)})});
+  if(!ev.length)return "";
+  ev.sort(function(x,y){return x.f<y.f?-1:x.f>y.f?1:0});
+  var tm=function(f){return new Date(f+"T00:00:00").getTime()};
+  var t0=tm(ev[0].f),tl=tm(ev[ev.length-1].f),td=new Date();td.setHours(0,0,0,0);
+  var tn=td.getTime(),tf=a.fecha?tm(a.fecha):null,t1=Math.max(tl,tn,tf||0);
+  if(!(t1>t0))return "";
+  var pts=[],ah=0,gas=0,i=0;
+  while(i<ev.length){
+    var f=ev[i].f;
+    while(i<ev.length&&ev[i].f===f){if(ev[i].t==="gasto")gas+=ev[i].v;else ah+=ev[i].v;i++}
+    pts.push({t:tm(f),f:f,ah:Math.max(0,ah),d:Math.max(0,ah-gas)});
+  }
+  var last=pts[pts.length-1],endT=Math.max(tl,tn);
+  if(endT>last.t)pts.push({t:endT,f:isoOfT(endT),ah:last.ah,d:last.d,ext:true});
+  var showPlan=!!(tf&&T.meta>0&&tf>t0),base=pts[0].ah,hasG=T.gas>0;
+  var W=Math.max(280,Math.min(880,(bw||360)-34)),H=W<520?210:250,pl=W<520?60:66,pr=14,pt=12,pb=28,iw=W-pl-pr,ih=H-pt-pb;
+  var max=T.meta>0?T.meta:0;pts.forEach(function(p){max=Math.max(max,p.ah,p.d)});
+  if(!(max>0))return "";
+  var tk=niceTicks(max*1.05),top=tk[tk.length-1]||1;
+  function X(t){return pl+(t-t0)/(t1-t0)*iw}
+  function Y(v){return pt+ih-Math.max(0,v)/top*ih}
+  function step(key){var d="",py="";pts.forEach(function(p,j){var x=X(p.t).toFixed(1),y=Y(p[key]).toFixed(1);d+=j?("L"+x+" "+py+"L"+x+" "+y):("M"+x+" "+y);py=y});return d}
+  var svg='<svg viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Cómo fue creciendo «'+esc(a.nombre)+'» con el tiempo">';
+  tk.forEach(function(v){
+    svg+='<line x1="'+pl+'" x2="'+(W-pr)+'" y1="'+Y(v).toFixed(1)+'" y2="'+Y(v).toFixed(1)+'" stroke="var(--line)" stroke-width="1"/>';
+    svg+='<text x="'+(pl-8)+'" y="'+(Y(v)+4).toFixed(1)+'" text-anchor="end">'+ahShort(v,mon)+'</text>';
+  });
+  for(var k=0;k<4;k++){
+    var tt=t0+(t1-t0)*k/3;
+    svg+='<text x="'+X(tt).toFixed(1)+'" y="'+(H-8)+'" text-anchor="'+(k===0?"start":k===3?"end":"middle")+'">'+fshort(isoOfT(tt))+'</text>';
+  }
+  if(T.meta>0)svg+='<line x1="'+pl+'" x2="'+(W-pr)+'" y1="'+Y(T.meta).toFixed(1)+'" y2="'+Y(T.meta).toFixed(1)+'" stroke="var(--c3)" stroke-width="2" stroke-dasharray="6 5"/>';
+  if(showPlan)svg+='<line x1="'+X(t0).toFixed(1)+'" y1="'+Y(base).toFixed(1)+'" x2="'+X(tf).toFixed(1)+'" y2="'+Y(T.meta).toFixed(1)+'" stroke="var(--muted)" stroke-width="2" stroke-dasharray="2 5" stroke-linecap="round"/>';
+  var mk=hasG?"d":"ah",main=step(mk);
+  svg+='<path d="'+main+'L'+X(pts[pts.length-1].t).toFixed(1)+' '+(pt+ih)+'L'+X(pts[0].t).toFixed(1)+' '+(pt+ih)+'Z" fill="var(--c1)" opacity=".10"/>';
+  if(hasG)svg+='<path d="'+step("ah")+'" fill="none" stroke="var(--c2)" stroke-width="2" stroke-dasharray="6 5" stroke-linejoin="round"/>';
+  svg+='<path d="'+main+'" fill="none" stroke="var(--c1)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>';
+  pts.forEach(function(p,j){
+    if(p.ext&&j!==pts.length-1)return;
+    var isLast=j===pts.length-1;
+    svg+='<circle cx="'+X(p.t).toFixed(1)+'" cy="'+Y(p[mk]).toFixed(1)+'" r="'+(isLast?4.5:3)+'" fill="var(--c1)" stroke="var(--surface)" stroke-width="2"><title>'+fshort(p.f)+': '+(hasG?'disponible '+ahMoney(p.d,mon)+' · ahorrado '+ahMoney(p.ah,mon):'ahorrado '+ahMoney(p.ah,mon))+'</title></circle>';
+  });
+  svg+='</svg>';
+  var lg='<div class="evo-leg"><span><i style="border-color:var(--c1)"></i>'+(hasG?"Disponible":"Ahorrado")+' ('+ahMoney(last.d,mon)+')</span>';
+  if(hasG)lg+='<span><i class="d" style="border-color:var(--c2)"></i>Ahorrado en total ('+ahMoney(last.ah,mon)+')</span>';
+  if(T.meta>0)lg+='<span><i class="d" style="border-color:var(--c3)"></i>Meta ('+ahMoney(T.meta,mon)+')</span>';
+  if(showPlan)lg+='<span><i class="d" style="border-color:var(--muted)"></i>Camino ideal hasta el '+fdate(a.fecha)+'</span>';
+  lg+='</div>';
+  return '<div class="gchart"><h3 class="hist-t">Cómo fue creciendo</h3>'+lg+svg+(showPlan?'<p class="hint">Cada escalón es plata que sumaste. Si tu línea azul va por encima de la punteada gris, vas adelantado.</p>':'')+'</div>';
 }
 function createAh(){
   var nEl=$("ai-new-name"),n=nEl.value.trim();
@@ -1519,7 +1621,7 @@ function openAsset(id){
   var a=state.activos[id];if(!a)return;
   var L=(a.lecturas||[]).filter(function(r){return r.f.indexOf(YEAR+"-")===0});
   var yrs=yearList().filter(function(y){return visibleIn(a,y)});
-  var h=sheetHead(a.nombre,"Aparece en: "+(yrs.length?yrs.join(", "):"ningún año")+".");
+  var h=sheetHead(a.nombre,"Aparece en: "+(yrs.length?yrs.join(", "):"ningún año")+"."+(soldLbl(a)?" Vendido desde "+soldLbl(a)+".":""));
   h+='<div class="row2"><label class="field">Nombre<input id="as-name" data-asset="'+esc(id)+'" maxlength="40" value="'+esc(a.nombre)+'"></label><label class="field">Tipo<select id="as-cat" data-asset="'+esc(id)+'">'+CATS.map(function(c){return '<option value="'+c[0]+'"'+(c[0]===a.categoria?" selected":"")+'>'+c[1]+'</option>'}).join("")+'</select></label></div>';
   h+='<h3 style="margin-top:4px">Valores cargados en '+YEAR+'</h3><div>';
   if(!L.length)h+='<p class="hint">No hay valores en este año.</p>';
@@ -1527,6 +1629,14 @@ function openAsset(id){
     h+='<div class="lect"><span>'+fdate(r.f)+' · <b>'+money1(r.v)+'</b></span><button type="button" data-delread="'+r.f+'" data-asset="'+esc(id)+'" aria-label="Borrar valor del '+fdate(r.f)+'">Borrar</button></div>';
   });
   h+='</div><p class="hint">Para cambiar un valor, cerrá esta ventana y escribilo directo en la tabla.</p>';
+  if(soldLbl(a)){
+    h+='<h3 style="margin-top:14px">Vendido</h3><p class="hint">Desde <b>'+soldLbl(a)+'</b> ya no suma al total ni a la torta, y no aparece en los años siguientes. Conservás todo su historial.</p><div class="btns" style="justify-content:flex-start"><button class="btn" type="button" data-unsell="'+esc(id)+'">Volver a tenerlo</button></div>';
+  }else{
+    var cy0=now.getFullYear(),dm0=YEAR===cy0?now.getMonth():11;
+    h+='<h3 style="margin-top:14px">¿Lo vendiste?</h3><p class="hint">Desde el mes que elijas deja de sumar al total y a la torta (cada mes muestra lo que tenés al cierre), y no aparece en los años siguientes. Conservás todo su historial.</p>';
+    h+='<div class="row2"><label class="field">Vendido en<select id="as-sold-m">'+MES.map(function(n,i){return '<option value="'+i+'"'+(i===dm0?" selected":"")+'>'+n+'</option>'}).join("")+'</select></label><label class="field">Año<select id="as-sold-y">'+yearList().map(function(y){return '<option value="'+y+'"'+(y===YEAR?" selected":"")+'>'+y+'</option>'}).join("")+'</select></label></div>';
+    h+='<p class="hint">Si sacaste esa plata de tus inversiones, escribila en negativo en «Pusiste este mes» de ese mes, así la ganancia no sale como pérdida.</p><div class="btns" style="justify-content:flex-start"><button class="btn" type="button" data-sell="'+esc(id)+'">Marcar como vendido</button></div>';
+  }
   h+='<div class="btns"><button class="btn danger" type="button" data-delasset="'+esc(id)+'">Eliminar de todos los años</button><button class="btn primary" type="button" data-close>Listo</button></div>';
   openSheet(h);
 }
@@ -1535,11 +1645,11 @@ function openActivos(){
   var h=sheetHead("Activos de "+YEAR,"Tildá los que tenías en "+YEAR+". Los que no tildes no aparecen en la tabla de este año.");
   if(!list.length)h+='<p class="hint">Todavía no cargaste ningún activo.</p>';
   CATS.forEach(function(c){
-    var rows=list.filter(function(x){return x.a.categoria===c[0]});if(!rows.length)return;
+    var rows=list.filter(function(x){var sy=soldYear(x.a);return x.a.categoria===c[0]&&!(sy!=null&&sy<YEAR)});if(!rows.length)return;
     h+='<h3>'+c[1]+'</h3>';
     rows.forEach(function(x){
       var has=hasReadings(x.a,YEAR),on=visibleIn(x.a,YEAR);
-      h+='<label class="chk"><input type="checkbox" data-act="'+esc(x.id)+'"'+(on?" checked":"")+(has?" disabled":"")+'><span>'+esc(x.a.nombre)+'</span>'+(has?'<small>tiene valores en '+YEAR+'</small>':"")+'</label>';
+      h+='<label class="chk"><input type="checkbox" data-act="'+esc(x.id)+'"'+(on?" checked":"")+(has?" disabled":"")+'><span>'+esc(x.a.nombre)+'</span>'+(has?'<small>tiene valores en '+YEAR+'</small>':(soldLbl(x.a)?'<small>vendido en '+soldLbl(x.a)+'</small>':""))+'</label>';
     });
   });
   h+='<h3>Agregar un activo nuevo</h3><div class="row2"><label class="field">Nombre<input id="n-name" maxlength="40" placeholder="Ej.: Meli"></label><label class="field">Tipo<select id="n-cat">'+CATS.map(function(c){return '<option value="'+c[0]+'">'+c[1]+'</option>'}).join("")+'</select></label></div><p class="hint">Se agrega a '+YEAR+'. Después escribí sus valores directo en la tabla.</p>';
@@ -1570,7 +1680,7 @@ function copyPrev(){
   var n=0;
   Object.keys(state.activos).forEach(function(id){
     var a=state.activos[id];
-    if(visibleIn(a,YEAR-1)&&!visibleIn(a,YEAR)){var o=clone(a);o.anios=(o.anios||[]).concat([YEAR]).sort(byNum);writeAsset(id,o);n++}
+    if(visibleIn(a,YEAR-1)&&!visibleIn(a,YEAR)&&!(soldYear(a)!=null&&soldYear(a)<YEAR)){var o=clone(a);o.anios=(o.anios||[]).concat([YEAR]).sort(byNum);writeAsset(id,o);n++}
   });
   toast(n?"Se agregaron "+n+" activos a "+YEAR:"No había activos para copiar");
 }
@@ -1578,6 +1688,7 @@ function copyPrev(){
 /* ---------- escribir valores en la celda ---------- */
 var edit=null;
 function startEdit(btn){
+  if(HIDE){toast("Mostrá los montos para poder editar (Ajustes)");return}
   var id=btn.dataset.asset,m=Number(btn.dataset.m),a=state.activos[id],td=btn.parentNode;
   if(!a||!td)return;
   var r=monthVal(a,m);
@@ -1699,7 +1810,7 @@ function fetchDolar(silent){
     state.dolar=o;
     enqueue(function(){return db.doc("config/dolar").set(o)});
     if(state.ready)renderAll(false);
-    if(!silent)toast("Dólar "+casaName(casa)+" actualizado: $ "+nf2.format(v));
+    if(!silent)toast("Dólar "+casaName(casa)+" actualizado: $ "+rf2.format(v));
     return true;
   }).catch(function(){
     if(!silent)toast("No pude traer la cotización. Probá de nuevo o escribila a mano.");
@@ -1719,9 +1830,9 @@ function openDolar(){
   var h=sheetHead("Cotización del dólar","Se actualiza sola cada vez que abrís la app. Elegí cuál querés usar, o escribila a mano si preferís.");
   var opts=CASAS.map(function(c){return '<option value="'+c[0]+'"'+(c[0]===(d.casa||"bolsa")?" selected":"")+'>'+c[1]+'</option>'}).join("");
   h+='<div class="row2"><label class="field">Tipo de dólar<select id="d-casa">'+opts+'</select></label><div class="field"><span>&nbsp;</span><button class="btn primary" type="button" id="d-auto">Traer cotización de hoy</button></div></div>';
-  h+='<p class="hint" style="margin-top:14px">'+(d.valor?'Ahora: $ '+nf2.format(d.valor)+(d.auto?" ("+casaName(d.casa)+", automático)":" (a mano)")+(d.fecha?" · "+fdate(d.fecha):""):"Todavía no hay cotización guardada.")+'</p>';
+  h+='<p class="hint" style="margin-top:14px">'+(d.valor?'Ahora: $ '+rf2.format(d.valor)+(d.auto?" ("+casaName(d.casa)+", automático)":" (a mano)")+(d.fecha?" · "+fdate(d.fecha):""):"Todavía no hay cotización guardada.")+'</p>';
   h+='<p class="hint" style="margin-top:14px"><b>O escribila a mano</b> (deja de actualizarse sola hasta que toques «Traer cotización de hoy»):</p>';
-  h+='<div class="row2"><label class="field">Pesos por dólar ($)<input id="d-val" inputmode="decimal" placeholder="0" value="'+(d.valor&&!d.auto?nf2.format(d.valor):"")+'"></label><label class="field">Fecha<input id="d-date" type="date" value="'+realToday()+'"></label></div>';
+  h+='<div class="row2"><label class="field">Pesos por dólar ($)<input id="d-val" inputmode="decimal" placeholder="0" value="'+(d.valor&&!d.auto?rf2.format(d.valor):"")+'"></label><label class="field">Fecha<input id="d-date" type="date" value="'+realToday()+'"></label></div>';
   h+='<div class="msg" id="d-msg" role="alert"></div><div class="btns"><button class="btn" type="button" data-close>Cerrar</button><button class="btn" type="button" id="d-save">Guardar a mano</button></div>';
   openSheet(h);
 }
@@ -1738,7 +1849,7 @@ function autoDolar(){
   state.dolar.casa=c;autoBusy=false;
   msg.textContent="Buscando…";
   fetchDolar(true).then(function(ok){
-    if(ok){usd=true;closeSheet();renderAll(true);toast("Dólar "+casaName(c)+" actualizado: $ "+nf2.format(state.dolar.valor))}
+    if(ok){usd=true;closeSheet();renderAll(true);toast("Dólar "+casaName(c)+" actualizado: $ "+rf2.format(state.dolar.valor))}
     else{var m=$("d-msg");if(m)m.textContent="No pude traer la cotización (sin internet o el servicio no responde). Escribila a mano."}
   });
 }
@@ -1825,6 +1936,22 @@ document.addEventListener("click",function(e){
     var tid=b.dataset.ahtoggle,ta=state.ahorros[tid];if(!ta)return;
     var to=clone(ta);to.mostrar=!to.mostrar;saveAh(tid,to);return;
   }
+  if((b=t.closest("[data-sell]"))){
+    var sellId=b.dataset.sell,sellA=state.activos[sellId],smEl=$("as-sold-m"),syEl=$("as-sold-y");
+    if(!sellA||!smEl||!syEl)return;
+    var sellOld=clone(sellA),sellNew=clone(sellA),sellM=Number(smEl.value),sellY=Number(syEl.value);
+    sellNew.vendido=sellY+"-"+pad(sellM+1);
+    writeAsset(sellId,sellNew);closeSheet();
+    toastUndo("«"+sellA.nombre+"» vendido desde "+MES[sellM].toLowerCase()+" "+sellY,function(){writeAsset(sellId,sellOld)});return;
+  }
+  if((b=t.closest("[data-unsell]"))){
+    var usId=b.dataset.unsell,usA=state.activos[usId];if(!usA)return;
+    var usOld=clone(usA),usNew=clone(usA);delete usNew.vendido;
+    writeAsset(usId,usNew);closeSheet();
+    toastUndo("«"+usA.nombre+"» volvió a tu cartera",function(){writeAsset(usId,usOld)});return;
+  }
+  if(t.closest("[data-hidetoggle]")){setHide(!HIDE);return}
+  if((b=t.closest("[data-ahdup]"))){dupAh(b.dataset.ahdup);return}
   if((b=t.closest("[data-ahopen]"))){goAh(b.dataset.ahopen);return}
   if(t.closest("[data-ahback]")){ahMode="list";ahCatForm=false;ahOpen=null;renderAll(true);window.scrollTo(0,0);return}
   if(t.closest("[data-hmore]")){ahHistAll=!ahHistAll;renderAll(true);return}
@@ -1880,7 +2007,7 @@ document.addEventListener("change",function(e){
   var t=e.target;
   if(t.classList&&t.classList.contains("ap")){
     var raw=t.value.trim(),k=pad(Number(t.dataset.m)+1),n=raw?parseNum(raw):null;
-    if(raw&&!(n>=0)){toast("Escribí un número válido");renderAll(true);return}
+    if(raw&&!isFinite(n)){toast("Escribí un número válido");renderAll(true);return}
     var m=clone(state.aportes.m);if(n==null)delete m[k];else m[k]=n;
     state.aportes.m=m;writeAportes();
   }else if(t.dataset&&t.dataset.f){
@@ -1943,16 +2070,19 @@ function backup(){
 }
 
 /* ---------- ajustes (engranaje) ---------- */
-var SETICO={"imp": "<path d=\"M12 16V4M7 9l5-5 5 5\"/><path d=\"M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3\"/>", "csv": "<path d=\"M12 4v12M7 11l5 5 5-5\"/><path d=\"M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3\"/>", "bak": "<path d=\"M12 3l8 3v6c0 4.5-3.2 7.8-8 9-4.8-1.200-8-4.500-8-9V6z\"/><path d=\"M9 12l2 2 4-4\"/>", "usd": "<circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M12 6.500v11M15 9.200c-.5-1-1.600-1.600-3-1.600-1.700 0-3 .9-3 2.200 0 3 6 1.500 6 4.200 0 1.300-1.300 2.200-3 2.200-1.400 0-2.500-.6-3-1.600\"/>", "out": "<path d=\"M9 21H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h4M16 17l5-5-5-5M21 12H9\"/>"};
+var SETICO={"eye":"<path d=\"M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z\"/><circle cx=\"12\" cy=\"12\" r=\"3\"/>","eyeoff":"<path d=\"M17.9 17.9A10.9 10.9 0 0 1 12 19C5 19 1 12 1 12a18.5 18.5 0 0 1 5.1-5.9M9.9 5.1A9.7 9.7 0 0 1 12 5c7 0 11 7 11 7a18.6 18.6 0 0 1-2.2 3.2M1 1l22 22\"/>","imp": "<path d=\"M12 16V4M7 9l5-5 5 5\"/><path d=\"M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3\"/>", "csv": "<path d=\"M12 4v12M7 11l5 5 5-5\"/><path d=\"M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3\"/>", "bak": "<path d=\"M12 3l8 3v6c0 4.5-3.2 7.8-8 9-4.8-1.200-8-4.500-8-9V6z\"/><path d=\"M9 12l2 2 4-4\"/>", "usd": "<circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M12 6.500v11M15 9.200c-.5-1-1.600-1.600-3-1.600-1.700 0-3 .9-3 2.200 0 3 6 1.500 6 4.200 0 1.300-1.300 2.200-3 2.200-1.400 0-2.500-.6-3-1.600\"/>", "out": "<path d=\"M9 21H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h4M16 17l5-5-5-5M21 12H9\"/>"};
 function setItem(k,t,d,cls){return '<button type="button" class="setitem'+(cls?" "+cls:"")+'" data-set="'+k+'"><span class="seti"><svg viewBox="0 0 24 24" aria-hidden="true">'+SETICO[k]+'</svg></span><span class="sett"><b>'+t+'</b><small>'+d+'</small></span></button>'}
+function setSwitch(k,ico,t,d,on){return '<button type="button" class="setitem" role="switch" aria-checked="'+(on?"true":"false")+'" data-set="'+k+'"><span class="seti"><svg viewBox="0 0 24 24" aria-hidden="true">'+SETICO[ico]+'</svg></span><span class="sett"><b>'+t+'</b><small>'+d+'</small></span><span class="swt'+(on?" on":"")+'" aria-hidden="true"></span></button>'}
 function openAjustes(){
   var u=auth.currentUser,h=sheetHead("Ajustes","");
+  h+='<div class="setgrp"><div class="setlbl">Privacidad</div>'+setSwitch("hide",HIDE?"eyeoff":"eye","Ocultar montos","Tapa los números con \u2022\u2022\u2022\u2022 en esta pantalla. Para editar, volvé a mostrarlos.",HIDE)+'</div>';
   h+='<div class="setgrp"><div class="setlbl">Datos</div>'+setItem("imp","Importar datos","Desde Excel, CSV o una copia de seguridad")+setItem("csv","Exportar CSV","Descargá el año que estás viendo")+setItem("bak","Copia de seguridad","Descargá todos tus datos en un archivo")+'</div>';
   h+='<div class="setgrp"><div class="setlbl">Moneda</div>'+setItem("usd","Dólar","Elegí MEP, Oficial, Blue o CCL, o escribilo a mano")+'</div>';
   h+='<div class="setgrp setsep"><div class="setlbl">Cuenta</div>'+(u&&u.email?'<div class="setmail">'+esc(u.email)+'</div>':'')+setItem("out","Cerrar sesión","Salir en este dispositivo","danger")+'</div>';
   openSheet(h);
 }
 function runSet(k){
+  if(k==="hide"){setHide(!HIDE);openAjustes();return}
   if(k==="imp"){openRestore();return}
   if(k==="usd"){openDolar();return}
   closeSheet();
@@ -2051,7 +2181,7 @@ function validBackup(o){
     return a&&typeof a.nombre==="string"&&CATS.some(function(c){return c[0]===a.categoria})&&Array.isArray(a.lecturas)&&a.lecturas.every(function(r){return r&&typeof r.f==="string"&&typeof r.v==="number"});
   });
 }
-function fsize(b){return b<1024?b+" B":b<1048576?nf0.format(b/1024)+" KB":nf1.format(b/1048576)+" MB"}
+function fsize(b){return b<1024?b+" B":b<1048576?rf0.format(b/1024)+" KB":rf1.format(b/1048576)+" MB"}
 function partYear(p){return p.y||impYear}
 function showImpErr(t){var m=$("rs-msg");if(m)m.textContent=t;var f=$("im-file");if(f)f.value=""}
 
@@ -2360,7 +2490,7 @@ function fbBoot(){
   state.apAll=store.aportesPorAnio;
   watchAportes();watchDolar();watchAportesAll();watchAhorros();
   renderAll(true);scrollTbl();
-  if(!Object.keys(store.activos).length&&!Object.keys(store.ahorros).length)toast("Todavía no hay datos. Usá «Cargar copia» para traer los que ya tenías.");
+  if(!Object.keys(store.activos).length&&!Object.keys(store.ahorros).length)toast("Todavía no hay datos. Usá Ajustes → Importar datos para traer los que ya tenías.");
 }
 function applyRemote(){
   state.activos=clone(store.activos);
