@@ -490,6 +490,26 @@ input.ap{font:inherit;font-family:var(--mono);font-size:13px;width:100%;min-widt
 body.hide .ap,body.hide #ini,body.hide .ce,body.hide .ai[data-f="tot"],body.hide .ai[data-f="meta"],body.hide .ai[data-f="gm"]{filter:blur(7px);pointer-events:none;user-select:none}
 .eyebtn{display:inline-flex;align-items:center;justify-content:center;padding-left:10px;padding-right:10px}
 .eyebtn svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.ph{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.ph h2{margin:0}
+.wzbar{height:6px;border-radius:99px;background:var(--line);overflow:hidden;flex:none}
+.wzbar i{display:block;height:100%;background:var(--accent);transition:width .2s}
+.wzcard{display:flex;flex-direction:column;gap:8px;padding:16px;border:1px solid var(--line);border-radius:12px;background:var(--wash)}
+.wzmeta{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--muted);font-weight:600}
+.wzc{padding:2px 10px;border-radius:999px;background:var(--cat);color:var(--catink)}
+.wzcard .wzname{margin:0;font-size:24px;line-height:1.2;overflow-wrap:anywhere;color:var(--ink);text-transform:none;letter-spacing:0;font-weight:700}
+.wzref{font-size:14px;color:var(--ink2)}
+.wzin,.wzap{font:inherit;width:100%;box-sizing:border-box;min-height:56px;padding:0 14px;border:2px solid var(--line2);border-radius:10px;background:var(--bg);color:var(--ink);font-size:26px;font-weight:700;text-align:right;font-variant-numeric:tabular-nums}
+.wzap{font-size:18px;min-height:44px}
+.wzin:focus,.wzap:focus{outline:none;border-color:var(--accent)}
+.wzdiff{min-height:20px;font-size:14px;color:var(--ink2)}
+.wzsame{align-self:flex-start}
+.wzbtns{display:grid;grid-template-columns:1fr 1fr 1.5fr;gap:8px}
+.wzbtns .btn{min-height:48px;padding:0 8px}
+.wzsum{display:flex;flex-direction:column;gap:4px;padding:16px;border:1px solid var(--line);border-radius:12px;background:var(--wash)}
+.wzbig{font-size:34px;font-weight:800;font-variant-numeric:tabular-nums}
+.wzsub{font-size:14px;color:var(--ink2)}
+.wzwarn{color:var(--neg)}
 .ahdr{display:flex;gap:8px;align-items:center}
 .gchart svg{display:block;width:100%;height:auto;margin-top:8px}
 .gchart text{font-family:var(--sans);fill:var(--ink2);font-size:11px}
@@ -560,7 +580,7 @@ body.lg-on .wrap,body.lg-on #nav{display:none!important}
   <div id="ahome" data-v="inicio"></div>
 
   <section class="panel" data-v="inv">
-    <h2>Mes a mes</h2>
+    <div class="ph"><h2>Mes a mes</h2><button class="btn primary" type="button" data-wzopen>Cargar el mes</button></div>
     <p class="hint mobonly">Tocá un valor, escribilo y apretá Enter. Con las flechas cambiás de mes.</p>
     <p class="hint deskonly">Valores en pesos. Tocá una celda, escribí el valor y apretá Enter; cada mes muestra el último valor cargado. Podés mover la tabla hacia los costados manteniendo apretado el mouse. El aporte se escribe en la fila de abajo.</p>
     <div class="tablewrap" id="tbl"></div>
@@ -1105,6 +1125,7 @@ function renderAvisos(){
 function goAviso(i){
   var a=($("avisos")._list||[])[i];if(!a)return;
   if(a.y!==YEAR)setYear(a.y);
+  if(a.k==="vp"||a.k==="vc"){openWizard(a.m);return}
   if(isMobile()){setView("inv");MV=a.m;renderAll(true)}
   var go=function(){
     var el=a.k==="ap"?$("ap-"+pad(a.m+1)):document.querySelector('.cellbtn[data-m="'+a.m+'"]');
@@ -1614,7 +1635,7 @@ function openSheet(html){
   $("sheet").innerHTML=html;$("ov").hidden=false;
   var f=$("sheet").querySelector("input,select");if(f)f.focus();
 }
-function closeSheet(){$("ov").hidden=true;$("sheet").innerHTML=""}
+function closeSheet(){$("ov").hidden=true;$("sheet").innerHTML="";wz=null}
 function sheetHead(title,sub){
   return '<header><div><h2 id="sh-title" style="font-size:18px">'+esc(title)+'</h2>'+(sub?'<p>'+sub+'</p>':"")+'</div><button class="x" type="button" data-close aria-label="Cerrar">×</button></header>';
 }
@@ -1938,6 +1959,8 @@ document.addEventListener("click",function(e){
     var tid=b.dataset.ahtoggle,ta=state.ahorros[tid];if(!ta)return;
     var to=clone(ta);to.mostrar=!to.mostrar;saveAh(tid,to);return;
   }
+  if(t.closest("[data-wzopen]")){openWizard(isMobile()?mvIndex(model()):null);return}
+  if((b=t.closest("[data-wz]"))){wzAct(b.dataset.wz);return}
   if((b=t.closest("[data-sell]"))){
     var sellId=b.dataset.sell,sellA=state.activos[sellId],smEl=$("as-sold-m"),syEl=$("as-sold-y");
     if(!sellA||!smEl||!syEl)return;
@@ -2070,6 +2093,110 @@ function backup(){
   var d=new Date(),f=d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());
   saveFile("inversiones-copia-"+f+".json",JSON.stringify({version:2,exportado:d.toISOString(),activos:store.activos,aportesPorAnio:store.aportesPorAnio,dolar:store.dolar||null,meta:store.meta||null,ahorros:store.ahorros||{}},null,1),"application/json");
 }
+
+
+/* ---------- cargar el mes de una vez ---------- */
+var wz=null;
+function wzIds(m){return model().list.filter(function(a){return heldIn(a,m,YEAR)}).map(function(a){return a.id})}
+function wzPrev(a,m){
+  for(var k=1;k<=24;k++){
+    var mm=m-k,yy=YEAR;while(mm<0){mm+=12;yy--}
+    var r=monthVal(a,mm,yy);if(r)return {v:r.v,m:mm,y:yy};
+  }
+  return null;
+}
+function openWizard(m){
+  var M=model();
+  if(!M.list.length){toast("Primero elegí los activos del año con el botón Activos");return}
+  if(m==null||m<0||m>11)m=YEAR===now.getFullYear()?now.getMonth():(M.latest>=0?Math.min(11,M.latest+1):0);
+  wz={m:m,i:0,ids:wzIds(m),saved:0};
+  openSheet(wzHTML());wzFocus();
+}
+function wzFocus(){var f=$("wz-in")||$("wz-ap");if(f){f.focus();try{f.select()}catch(e){}}}
+function wzRender(){if(!wz)return;$("sheet").innerHTML=wzHTML();wzFocus();wzDiff()}
+function wzHTML(){
+  var m=wz.m,n=wz.ids.length,h=sheetHead("Cargar el mes",MES[m]+" "+YEAR);
+  if(!n)return h+'<p class="hint">No hay activos para cargar en '+MES[m].toLowerCase()+'.</p><div class="btns"><button class="btn primary" type="button" data-close>Cerrar</button></div>';
+  var i=Math.min(wz.i,n),fin=wz.i>=n;
+  h+='<div class="wzbar" role="progressbar" aria-valuemin="0" aria-valuemax="'+n+'" aria-valuenow="'+i+'"><i style="width:'+(i/n*100).toFixed(1)+'%"></i></div>';
+  if(wz.i===0)h+='<label class="field">Mes<select id="wz-m">'+MES.map(function(x,k){return '<option value="'+k+'"'+(k===m?" selected":"")+'>'+x+'</option>'}).join("")+'</select></label>';
+  if(!fin){
+    var id=wz.ids[wz.i],a=state.activos[id],r=monthVal(a,m),pv=wzPrev(a,m),cn=(CATS.filter(function(c){return c[0]===a.categoria})[0]||["",""])[1];
+    h+='<div class="wzcard"><div class="wzmeta"><span class="wzc">'+esc(cn)+'</span><span>'+(wz.i+1)+' de '+n+'</span></div><h3 class="wzname">'+esc(a.nombre)+'</h3>';
+    h+='<div class="wzref">'+(pv?MES[pv.m]+(pv.y!==YEAR?" "+pv.y:"")+': <b>'+money1(pv.v)+'</b>':'Todavía no tiene valores de meses anteriores')+'</div>';
+    h+='<input class="wzin" id="wz-in" inputmode="decimal" autocomplete="off" placeholder="$ 0" aria-label="Valor de '+esc(a.nombre)+' en '+MES[m]+'" value="'+(r&&!HIDE?esc(String(r.v).replace(".",",")):"")+'">';
+    h+='<div class="wzdiff" id="wz-diff" aria-live="polite"></div><div class="msg" id="wz-msg" role="alert"></div>';
+    if(pv)h+='<button class="btn wzsame" type="button" data-wz="same">Mismo valor que en '+MES[pv.m].toLowerCase()+'</button>';
+    h+='</div><div class="wzbtns"><button class="btn" type="button" data-wz="prev"'+(wz.i===0?" disabled":"")+'>‹ Anterior</button><button class="btn" type="button" data-wz="skip">Saltar</button><button class="btn primary" type="button" data-wz="next">'+(wz.i===n-1?"Ver resumen ›":"Siguiente ›")+'</button></div>';
+    h+='<p class="hint">Escribí el valor y apretá Enter para pasar al siguiente. «Saltar» deja ese activo como está.</p>';
+    return h;
+  }
+  var M=model(),tot=M.totals[m],pt=m===0?M.ini:M.totals[m-1];
+  var miss=wz.ids.filter(function(id){return !monthVal(state.activos[id],m)}).map(function(id){return esc(state.activos[id].nombre)});
+  var apv=state.aportes.m[pad(m+1)];
+  h+='<div class="wzsum"><div class="wzbig">'+(tot==null?'<span class="dash">—</span>':money0(tot))+'</div><div class="wzsub">Total de '+MES[m].toLowerCase()+'</div>';
+  if(tot!=null&&pt>0)h+='<div class="wzsub">'+deltaHTML(tot-pt,true)+' · '+pctHTML((tot-pt)/pt*100)+' respecto del mes anterior</div>';
+  h+='<div class="wzsub">Cargaste '+wz.saved+(wz.saved===1?" valor":" valores")+' en esta vuelta.</div></div>';
+  if(miss.length)h+='<p class="hint wzwarn">Sin valor en '+MES[m].toLowerCase()+': <b>'+miss.join(", ")+'</b>. El total puede verse más bajo de lo real.</p>';
+  h+='<label class="field">Pusiste este mes (opcional)<input class="wzap" id="wz-ap" inputmode="decimal" autocomplete="off" placeholder="$ 0" value="'+(typeof apv==="number"&&!HIDE?rf2.format(apv):"")+'"></label><p class="hint">Si no pusiste nada, escribí 0. Si sacaste plata, escribila en negativo.</p><div class="msg" id="wz-msg" role="alert"></div>';
+  h+='<div class="btns"><button class="btn" type="button" data-wz="prev">‹ Anterior</button><button class="btn primary" type="button" data-wz="save">Guardar y cerrar</button></div>';
+  return h;
+}
+function wzDiff(){
+  var el=$("wz-diff"),inp=$("wz-in");if(!el||!inp||!wz)return;
+  var raw=inp.value.trim(),n=raw?parseNum(raw):null,a=state.activos[wz.ids[wz.i]],pv=a?wzPrev(a,wz.m):null;
+  if(!(n>=0)||!pv||!(pv.v>0)){el.innerHTML="";return}
+  var d=n-pv.v,pc=d/pv.v*100;
+  el.innerHTML=deltaHTML(d,true)+' · <span class="'+(pc>0?"pos":pc<0?"neg":"")+'">'+pctHTML(pc)+'</span> respecto de '+MES[pv.m].toLowerCase();
+}
+function wzMsg(t){var e=$("wz-msg");if(e)e.textContent=t||""}
+function wzCommit(){
+  var inp=$("wz-in");if(!inp)return true;
+  var raw=inp.value.trim();if(!raw)return true;
+  var n=parseNum(raw);
+  if(!(n>=0)){wzMsg("Escribí un número válido");inp.focus();return false}
+  var a=state.activos[wz.ids[wz.i]];if(!a)return true;
+  var r=monthVal(a,wz.m);
+  if(!r||Math.abs(r.v-n)>1e-9){
+    var f=r?r.f:defaultDate(wz.m),o=clone(a);
+    o.lecturas=(o.lecturas||[]).filter(function(x){return x.f!==f});
+    o.lecturas.push({f:f,v:n});
+    o.lecturas.sort(function(x,y){return x.f<y.f?-1:x.f>y.f?1:0});
+    writeAsset(wz.ids[wz.i],o);wz.saved++;
+  }
+  return true;
+}
+function wzAct(k){
+  if(!wz)return;
+  if(k==="prev"){if(wz.i>0){wz.i--;wzRender()}return}
+  if(k==="skip"){wz.i++;wzRender();return}
+  if(k==="same"){
+    var a0=state.activos[wz.ids[wz.i]],pv=a0&&wzPrev(a0,wz.m);
+    if(!pv)return;
+    $("wz-in").value=String(pv.v).replace(".",",");k="next";
+  }
+  if(k==="next"){if(!wzCommit())return;wz.i++;wzRender();return}
+  if(k==="save"){
+    var ap=$("wz-ap"),raw=ap?ap.value.trim():"",mm=wz.m,sv=wz.saved;
+    if(raw){
+      var v=parseNum(raw);
+      if(!isFinite(v)){wzMsg("Escribí un número válido");ap.focus();return}
+      var key=pad(mm+1),cp=clone(state.aportes.m);
+      if(cp[key]!==v){cp[key]=v;state.aportes.m=cp;writeAportes()}
+    }
+    closeSheet();
+    toast("Listo: cargaste "+sv+(sv===1?" valor":" valores")+" de "+MES[mm].toLowerCase());
+  }
+}
+document.addEventListener("input",function(e){if(e.target.id==="wz-in")wzDiff()});
+document.addEventListener("keydown",function(e){
+  if(e.key!=="Enter")return;
+  if(e.target.id==="wz-in"){e.preventDefault();wzAct("next")}
+  else if(e.target.id==="wz-ap"){e.preventDefault();wzAct("save")}
+});
+document.addEventListener("change",function(e){
+  if(e.target.id==="wz-m"&&wz){wz.m=Number(e.target.value);wz.ids=wzIds(wz.m);wz.i=0;wzRender()}
+});
 
 /* ---------- ajustes (engranaje) ---------- */
 var SETICO={"eye":"<path d=\"M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z\"/><circle cx=\"12\" cy=\"12\" r=\"3\"/>","eyeoff":"<path d=\"M17.9 17.9A10.9 10.9 0 0 1 12 19C5 19 1 12 1 12a18.5 18.5 0 0 1 5.1-5.9M9.9 5.1A9.7 9.7 0 0 1 12 5c7 0 11 7 11 7a18.6 18.6 0 0 1-2.2 3.2M1 1l22 22\"/>","imp": "<path d=\"M12 16V4M7 9l5-5 5 5\"/><path d=\"M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3\"/>", "csv": "<path d=\"M12 4v12M7 11l5 5 5-5\"/><path d=\"M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3\"/>", "bak": "<path d=\"M12 3l8 3v6c0 4.5-3.2 7.8-8 9-4.8-1.200-8-4.500-8-9V6z\"/><path d=\"M9 12l2 2 4-4\"/>", "usd": "<circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M12 6.500v11M15 9.200c-.5-1-1.600-1.600-3-1.600-1.700 0-3 .9-3 2.200 0 3 6 1.500 6 4.200 0 1.300-1.300 2.200-3 2.200-1.400 0-2.500-.6-3-1.600\"/>", "out": "<path d=\"M9 21H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h4M16 17l5-5-5-5M21 12H9\"/>"};
