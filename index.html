@@ -490,6 +490,11 @@ input.ap{font:inherit;font-family:var(--mono);font-size:13px;width:100%;min-widt
 body.hide .ap,body.hide #ini,body.hide .ce,body.hide .ai[data-f="tot"],body.hide .ai[data-f="meta"],body.hide .ai[data-f="gm"]{filter:blur(7px);pointer-events:none;user-select:none}
 .eyebtn{display:inline-flex;align-items:center;justify-content:center;padding-left:10px;padding-right:10px}
 .eyebtn svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.lg-sug{display:flex;flex-direction:column;gap:8px;padding:10px 12px;border:1px solid var(--line2);border-radius:8px;background:var(--wash);font-size:14px;color:var(--ink)}
+.lg-sb{display:flex;gap:8px;flex-wrap:wrap}
+.vbn{display:flex;flex-direction:column;gap:10px;padding:12px 14px;margin:0 0 12px;border:1px solid var(--line2);border-left:4px solid var(--accent);border-radius:10px;background:var(--surface);font-size:14px;color:var(--ink)}
+.vbb{display:flex;gap:8px;flex-wrap:wrap}
+.vtag{font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;background:color-mix(in srgb,var(--neg) 12%,transparent);color:var(--neg)}
 .ph{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
 .ph h2{margin:0}
 .wzbar{height:6px;border-radius:99px;background:var(--line);overflow:hidden;flex:none}
@@ -552,7 +557,7 @@ body.lg-on .wrap,body.lg-on #nav{display:none!important}
 <h1>Mis inversiones</h1><p>Entrá con tu correo y contraseña. Tus datos quedan guardados en tu cuenta y son los mismos en el celular y en la computadora.</p>
 <label class="field">Correo<input id="lg-mail" type="email" autocomplete="username" inputmode="email"></label>
 <label class="field">Contraseña<input id="lg-pass" type="password" autocomplete="current-password"></label>
-<div class="lg-msg" id="lg-msg" role="alert"></div>
+<div class="lg-sug" id="lg-sug" hidden></div><div class="lg-msg" id="lg-msg" role="alert"></div>
 <div class="btns"><button class="btn primary" id="lg-in" type="submit">Entrar</button><button class="btn" id="lg-new" type="button">Crear cuenta</button></div>
 <button class="lg-rst" id="lg-rst" type="button">Olvidé mi contraseña</button>
 </form></div>
@@ -575,6 +580,7 @@ body.lg-on .wrap,body.lg-on #nav{display:none!important}
     <div class="kpis" id="kpis"></div>
   </section>
 
+  <div id="vbanner"></div>
   <div id="banner"></div>
   <div id="avisos" data-v="inicio inv"></div>
   <div id="ahome" data-v="inicio"></div>
@@ -1771,6 +1777,29 @@ function exportCsv(){
   saveFile("Inversiones"+YEAR+".csv","\uFEFF"+L.join("\r\n"),"text/csv;charset=utf-8");
 }
 
+function exportAhCsv(){
+  var L=ahList();
+  if(!L.length){toast("Todavía no tenés ahorros para exportar");return}
+  var q=function(v){v=v==null?"":String(v);return /[;"\r\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v};
+  var num=function(v){return v==null?"":String(Math.round(v*100)/100).replace(".",",")};
+  var out=[["Resumen de ahorros"],["Ahorro","Estado","Moneda","Fecha objetivo","Categoría","Meta","Ahorrado","Gastado","Disponible"]],mov=[];
+  L.forEach(function(x){
+    var a=x.a,T=ahTotals(a),mon=a.moneda==="USD"?"Dólares":"Pesos",est=a.archivado?"Archivado":"Activo",fe=a.fecha?fdate(a.fecha):"";
+    (a.cats||[]).forEach(function(c){
+      var s=catSums(c);
+      out.push([a.nombre,est,mon,fe,c.nombre,c.meta>0?num(c.meta):"",num(s.ah),num(s.gas),num(s.disp)]);
+      (c.mov||[]).forEach(function(m){mov.push({n:a.nombre,mon:mon,c:c.nombre,f:m.f||"",t:m.t,v:m.v,note:m.n||""})});
+    });
+    out.push([a.nombre,est,mon,fe,"TOTAL",T.meta>0?num(T.meta):"",num(T.ah),num(T.gas),num(T.disp)]);
+  });
+  out.push([]);out.push(["Movimientos"]);
+  out.push(["Ahorro","Moneda","Categoría","Fecha","Tipo","Monto","Nota"]);
+  mov.sort(function(a,b){return a.n<b.n?-1:a.n>b.n?1:a.f<b.f?-1:a.f>b.f?1:0});
+  mov.forEach(function(m){out.push([m.n,m.mon,m.c,m.f?fdate(m.f):"",m.t==="gasto"?"Gasto":"Ingreso",num(m.t==="gasto"?-m.v:m.v),m.note])});
+  var d=new Date();
+  saveFile("Ahorros-"+d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate())+".csv","\uFEFF"+out.map(function(r){return r.map(q).join(";")}).join("\r\n"),"text/csv;charset=utf-8");
+}
+
 /* ---------- año ---------- */
 var extraYears={},unAp=null,usd=false;
 function yearList(){
@@ -2199,21 +2228,23 @@ document.addEventListener("change",function(e){
 });
 
 /* ---------- ajustes (engranaje) ---------- */
-var SETICO={"eye":"<path d=\"M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z\"/><circle cx=\"12\" cy=\"12\" r=\"3\"/>","eyeoff":"<path d=\"M17.9 17.9A10.9 10.9 0 0 1 12 19C5 19 1 12 1 12a18.5 18.5 0 0 1 5.1-5.9M9.9 5.1A9.7 9.7 0 0 1 12 5c7 0 11 7 11 7a18.6 18.6 0 0 1-2.2 3.2M1 1l22 22\"/>","imp": "<path d=\"M12 16V4M7 9l5-5 5 5\"/><path d=\"M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3\"/>", "csv": "<path d=\"M12 4v12M7 11l5 5 5-5\"/><path d=\"M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3\"/>", "bak": "<path d=\"M12 3l8 3v6c0 4.5-3.2 7.8-8 9-4.8-1.200-8-4.500-8-9V6z\"/><path d=\"M9 12l2 2 4-4\"/>", "usd": "<circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M12 6.500v11M15 9.200c-.5-1-1.600-1.600-3-1.600-1.700 0-3 .9-3 2.200 0 3 6 1.500 6 4.200 0 1.300-1.300 2.200-3 2.200-1.400 0-2.500-.6-3-1.600\"/>", "out": "<path d=\"M9 21H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h4M16 17l5-5-5-5M21 12H9\"/>"};
+var SETICO={"csvah":"<path d=\"M12 4v12M7 11l5 5 5-5\"/><path d=\"M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3\"/>","mail":"<path d=\"M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z\"/><path d=\"M22 6l-10 7L2 6\"/>","eye":"<path d=\"M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z\"/><circle cx=\"12\" cy=\"12\" r=\"3\"/>","eyeoff":"<path d=\"M17.9 17.9A10.9 10.9 0 0 1 12 19C5 19 1 12 1 12a18.5 18.5 0 0 1 5.1-5.9M9.9 5.1A9.7 9.7 0 0 1 12 5c7 0 11 7 11 7a18.6 18.6 0 0 1-2.2 3.2M1 1l22 22\"/>","imp": "<path d=\"M12 16V4M7 9l5-5 5 5\"/><path d=\"M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3\"/>", "csv": "<path d=\"M12 4v12M7 11l5 5 5-5\"/><path d=\"M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3\"/>", "bak": "<path d=\"M12 3l8 3v6c0 4.5-3.2 7.8-8 9-4.8-1.200-8-4.500-8-9V6z\"/><path d=\"M9 12l2 2 4-4\"/>", "usd": "<circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M12 6.500v11M15 9.200c-.5-1-1.600-1.600-3-1.600-1.700 0-3 .9-3 2.200 0 3 6 1.500 6 4.200 0 1.300-1.300 2.200-3 2.200-1.400 0-2.500-.6-3-1.600\"/>", "out": "<path d=\"M9 21H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h4M16 17l5-5-5-5M21 12H9\"/>"};
 function setItem(k,t,d,cls){return '<button type="button" class="setitem'+(cls?" "+cls:"")+'" data-set="'+k+'"><span class="seti"><svg viewBox="0 0 24 24" aria-hidden="true">'+SETICO[k]+'</svg></span><span class="sett"><b>'+t+'</b><small>'+d+'</small></span></button>'}
 function setSwitch(k,ico,t,d,on){return '<button type="button" class="setitem" role="switch" aria-checked="'+(on?"true":"false")+'" data-set="'+k+'"><span class="seti"><svg viewBox="0 0 24 24" aria-hidden="true">'+SETICO[ico]+'</svg></span><span class="sett"><b>'+t+'</b><small>'+d+'</small></span><span class="swt'+(on?" on":"")+'" aria-hidden="true"></span></button>'}
 function openAjustes(){
   var u=auth.currentUser,h=sheetHead("Ajustes","");
-  h+='<div class="setgrp"><div class="setlbl">Datos</div>'+setItem("imp","Importar datos","Desde Excel, CSV o una copia de seguridad")+setItem("csv","Exportar CSV","Descargá el año que estás viendo")+setItem("bak","Copia de seguridad","Descargá todos tus datos en un archivo")+'</div>';
+  h+='<div class="setgrp"><div class="setlbl">Datos</div>'+setItem("imp","Importar datos","Desde Excel, CSV o una copia de seguridad")+setItem("csv","Exportar inversiones","La tabla del año que estás viendo (CSV)")+setItem("csvah","Exportar ahorros","Resumen y todos los movimientos (CSV)")+setItem("bak","Copia de seguridad","Descargá todos tus datos en un archivo")+'</div>';
   h+='<div class="setgrp"><div class="setlbl">Moneda</div>'+setItem("usd","Dólar","Elegí MEP, Oficial, Blue o CCL, o escribilo a mano")+'</div>';
-  h+='<div class="setgrp setsep"><div class="setlbl">Cuenta</div>'+(u&&u.email?'<div class="setmail">'+esc(u.email)+'</div>':'')+setItem("out","Cerrar sesión","Salir en este dispositivo","danger")+'</div>';
+  h+='<div class="setgrp setsep"><div class="setlbl">Cuenta</div>'+(u&&u.email?'<div class="setmail">'+esc(u.email)+(u.emailVerified?"":' \u00b7 <span class="vtag">sin confirmar</span>')+'</div>':'')+setItem("mail","Cambiar correo","Si lo escribiste mal o querés usar otro")+setItem("out","Cerrar sesión","Salir en este dispositivo","danger")+'</div>';
   openSheet(h);
 }
 function runSet(k){
+  if(k==="mail"){openMailChange();return}
   if(k==="imp"){openRestore();return}
   if(k==="usd"){openDolar();return}
   closeSheet();
   if(k==="csv")exportCsv();
+  else if(k==="csvah")exportAhCsv();
   else if(k==="bak")backup();
   else if(k==="out")auth.signOut().then(function(){location.reload()});
 }
@@ -2585,6 +2616,109 @@ db={doc:function(p){
 
 /* sesión */
 var LG=$("lg");
+/* ---------- correo: validar, confirmar y cambiar ---------- */
+var MAIL_DOMS=["gmail.com","hotmail.com","outlook.com","yahoo.com","yahoo.com.ar","hotmail.com.ar","icloud.com","live.com","outlook.es","hotmail.es","yahoo.es","protonmail.com","me.com","msn.com"];
+function osa(a,b){
+  var d=[],i,j;
+  for(i=0;i<=a.length;i++)d[i]=[i];
+  for(j=1;j<=b.length;j++)d[0][j]=j;
+  for(i=1;i<=a.length;i++)for(j=1;j<=b.length;j++){
+    d[i][j]=Math.min(d[i-1][j]+1,d[i][j-1]+1,d[i-1][j-1]+(a.charAt(i-1)===b.charAt(j-1)?0:1));
+    if(i>1&&j>1&&a.charAt(i-1)===b.charAt(j-2)&&a.charAt(i-2)===b.charAt(j-1))d[i][j]=Math.min(d[i][j],d[i-2][j-2]+1);
+  }
+  return d[a.length][b.length];
+}
+function emailCheck(em){
+  em=String(em||"").trim();
+  var bad={ok:false,msg:"Ese correo no parece válido. Tiene que ser algo como nombre@gmail.com."};
+  var m=/^([^\s@]+)@([^\s@]+)$/.exec(em);
+  if(!m)return bad;
+  var loc=m[1],dom=m[2].toLowerCase();
+  if(!/^[A-Za-z0-9.!#$%&'*+\/=?^_`{|}~-]+$/.test(loc)||loc.charAt(0)==="."||loc.slice(-1)==="."||loc.indexOf("..")>=0)return bad;
+  if(!/^([a-z0-9-]+\.)+[a-z]{2,}$/.test(dom)||/(^|\.)-|-(\.|$)/.test(dom))return bad;
+  if(MAIL_DOMS.indexOf(dom)>=0)return {ok:true};
+  var best=null,bd=99;
+  MAIL_DOMS.forEach(function(x){var d=osa(dom,x);if(d<bd){bd=d;best=x}});
+  return bd===1?{ok:true,suggest:loc+"@"+best}:{ok:true};
+}
+function sugHTML(sug,attr){
+  return '<span>¿Quisiste decir <b>'+esc(sug)+'</b>?</span><span class="lg-sb"><button type="button" class="mini" data-'+attr+'="use" data-sug="'+esc(sug)+'">Sí, usar ese</button><button type="button" class="mini" data-'+attr+'="keep">No, está bien así</button></span>';
+}
+function authMsg(c){
+  var M={"auth/invalid-credential":"La contraseña no es correcta.","auth/wrong-password":"La contraseña no es correcta.","auth/invalid-email":"Escribí un correo válido.","auth/email-already-in-use":"Ese correo ya tiene una cuenta.","auth/too-many-requests":"Demasiados intentos. Esperá unos minutos y probá de nuevo.","auth/network-request-failed":"No hay conexión. Probá de nuevo.","auth/requires-recent-login":"Cerrá sesión, volvé a entrar y probá de nuevo.","auth/operation-not-allowed":"Firebase no permite este cambio todavía. Revisá que el método Correo/contraseña esté activado."};
+  return M[c]||"No se pudo completar: "+(c||"error");
+}
+/* login: sugerir corrección al crear cuenta */
+var lgKeep="";
+function lgSug(sug){var e=$("lg-sug");if(!sug){e.hidden=true;e.innerHTML="";return}e.hidden=false;e.innerHTML=sugHTML(sug,"lgsug")}
+$("lg-mail").addEventListener("input",function(){lgSug(null);lgKeep=""});
+$("lg").addEventListener("click",function(e){
+  var b=e.target.closest&&e.target.closest("[data-lgsug]");if(!b)return;
+  if(b.dataset.lgsug==="use"){$("lg-mail").value=b.dataset.sug;lgSug(null);lgKeep="";$("lg-pass").focus()}
+  else{lgKeep=$("lg-mail").value.trim();lgSug(null);lgGo("new")}
+});
+/* aviso de correo sin confirmar */
+var vHide=false;try{vHide=sessionStorage.getItem("inv-vhide")==="1"}catch(e){}
+function renderVerify(){
+  var el=$("vbanner"),u=auth.currentUser;
+  if(!u||u.emailVerified||vHide){el.innerHTML="";return}
+  el.innerHTML='<div class="vbn" role="status"><div><b>Confirmá tu correo.</b> Te mandamos un mail a <b>'+esc(u.email||"")+'</b> con un link. Si no te llega o lo escribiste mal, cambialo en Ajustes → Cuenta.</div><div class="vbb"><button class="mini" type="button" data-vb="send">Reenviar mail</button><button class="mini" type="button" data-vb="check">Ya lo confirmé</button><button class="mini" type="button" data-vb="later">Más tarde</button></div></div>';
+}
+document.addEventListener("click",function(e){
+  var b=e.target.closest&&e.target.closest("[data-vb]");if(!b)return;
+  var u=auth.currentUser,k=b.dataset.vb;if(!u)return;
+  if(k==="later"){vHide=true;try{sessionStorage.setItem("inv-vhide","1")}catch(x){}renderVerify();return}
+  if(k==="send"){
+    b.disabled=true;
+    u.sendEmailVerification().then(function(){toast("Te mandamos el mail a "+u.email)}).catch(function(er){toast(er&&er.code==="auth/too-many-requests"?"Esperá unos minutos antes de pedir otro mail":"No se pudo mandar el mail")}).then(function(){b.disabled=false});
+    return;
+  }
+  u.reload().then(function(){toast(u.emailVerified?"¡Correo confirmado!":"Todavía no figura confirmado. Tocá el link del mail y volvé a probar.");renderVerify()}).catch(function(){toast("No se pudo revisar ahora")});
+});
+window.addEventListener("focus",function(){var u=auth.currentUser;if(u&&!u.emailVerified)u.reload().then(renderVerify).catch(function(){})});
+/* cambiar correo */
+var mcKeep="";
+function openMailChange(){
+  var u=auth.currentUser;if(!u)return;
+  mcKeep="";
+  var h=sheetHead("Cambiar correo","Ahora entrás con "+(u.email||"")+".");
+  h+='<label class="field">Correo nuevo<input id="mc-new" type="email" inputmode="email" autocomplete="off"></label>';
+  h+='<label class="field">Tu contraseña actual<input id="mc-pass" type="password" autocomplete="current-password"></label>';
+  h+='<div class="lg-sug" id="mc-sug" hidden></div><div class="msg" id="mc-msg" role="alert"></div>';
+  h+='<p class="hint">Te mandamos un mail al correo nuevo con un link. El cambio vale recién cuando lo tocás; hasta entonces seguís entrando con el correo de ahora. Tus datos no se tocan.</p>';
+  h+='<div class="btns"><button class="btn" type="button" data-close>Cancelar</button><button class="btn primary" type="button" id="mc-go">Mandar confirmación</button></div>';
+  openSheet(h);
+}
+function mcMsg(t,ok){var m=$("mc-msg");if(m){m.textContent=t||"";m.style.color=ok?"var(--pos)":""}}
+function mcSug(sug){var e=$("mc-sug");if(!e)return;if(!sug){e.hidden=true;e.innerHTML="";return}e.hidden=false;e.innerHTML=sugHTML(sug,"mcsug")}
+function doMailChange(){
+  var u=auth.currentUser,nm=$("mc-new").value.trim(),pw=$("mc-pass").value;
+  if(!u)return;
+  mcMsg("");
+  var ck=emailCheck(nm);
+  if(!ck.ok){mcSug(null);mcMsg(ck.msg);$("mc-new").focus();return}
+  if(nm.toLowerCase()===String(u.email||"").toLowerCase()){mcMsg("Ese ya es tu correo actual.");return}
+  if(ck.suggest&&mcKeep!==nm){mcSug(ck.suggest);return}
+  mcSug(null);
+  if(!pw){mcMsg("Escribí tu contraseña actual.");$("mc-pass").focus();return}
+  var go=$("mc-go");go.disabled=true;
+  u.reauthenticateWithCredential(firebase.auth.EmailAuthProvider.credential(u.email,pw))
+    .then(function(){return u.verifyBeforeUpdateEmail(nm)})
+    .then(function(){mcMsg("Listo. Te mandamos un mail a "+nm+". Tocá el link para confirmar el cambio; después entrá con el correo nuevo.",true);$("mc-pass").value=""})
+    .catch(function(er){mcMsg(authMsg(er&&er.code))})
+    .then(function(){go.disabled=false});
+}
+document.addEventListener("click",function(e){
+  var t=e.target,b;
+  if(t.id==="mc-go"){doMailChange();return}
+  if((b=t.closest&&t.closest("[data-mcsug]"))){
+    if(b.dataset.mcsug==="use"){$("mc-new").value=b.dataset.sug;mcSug(null);mcKeep="";$("mc-pass").focus()}
+    else{mcKeep=$("mc-new").value.trim();mcSug(null);doMailChange()}
+  }
+});
+document.addEventListener("input",function(e){if(e.target.id==="mc-new"){mcSug(null);mcKeep=""}});
+document.addEventListener("keydown",function(e){if(e.key==="Enter"&&(e.target.id==="mc-pass"||e.target.id==="mc-new")){e.preventDefault();doMailChange()}});
+
 function lgMsg(t,ok){var m=$("lg-msg");m.textContent=t||"";m.className="lg-msg"+(ok?" ok":"")}
 function lgErr(e){
   var c=(e&&e.code)||"";
@@ -2595,12 +2729,16 @@ function lgBusy(b){["lg-in","lg-new","lg-rst"].forEach(function(i){$(i).disabled
 function lgGo(kind){
   var em=$("lg-mail").value.trim(),pw=$("lg-pass").value;
   if(!em){lgMsg("Escribí tu correo.");$("lg-mail").focus();return}
+  var ck=emailCheck(em);
+  if(!ck.ok){lgSug(null);lgMsg(ck.msg);$("lg-mail").focus();return}
+  if(kind==="new"&&ck.suggest&&lgKeep!==em){lgMsg("");lgSug(ck.suggest);return}
+  lgSug(null);
   if(kind==="reset"){
     lgBusy(true);auth.sendPasswordResetEmail(em).then(function(){lgMsg("Te mandamos un correo para cambiar la contraseña.",true)}).catch(lgErr).then(function(){lgBusy(false)});return;
   }
   if(!pw){lgMsg("Escribí tu contraseña.");$("lg-pass").focus();return}
   lgBusy(true);lgMsg("");
-  (kind==="new"?auth.createUserWithEmailAndPassword(em,pw):auth.signInWithEmailAndPassword(em,pw)).catch(lgErr).then(function(){lgBusy(false)});
+  (kind==="new"?auth.createUserWithEmailAndPassword(em,pw):auth.signInWithEmailAndPassword(em,pw)).then(function(c){if(kind==="new"&&c&&c.user)c.user.sendEmailVerification().catch(function(){})}).catch(lgErr).then(function(){lgBusy(false)});
 }
 $("lg-in").addEventListener("click",function(){lgGo("in")});
 $("lg-new").addEventListener("click",function(){lgGo("new")});
@@ -2644,8 +2782,8 @@ function listen(c){
   },function(e){toast("No se pudo leer la nube: "+((e&&e.message)||"error"))}));
 }
 auth.onAuthStateChanged(function(u){
-  if(!u){uid=null;stopListeners();booted=false;loadedC={};LG.hidden=false;document.body.classList.add("lg-on");return}
-  uid=u.uid;LG.hidden=true;document.body.classList.remove("lg-on");$("lg-pass").value="";
+  if(!u){uid=null;renderVerify();stopListeners();booted=false;loadedC={};LG.hidden=false;document.body.classList.add("lg-on");return}
+  uid=u.uid;renderVerify();LG.hidden=true;document.body.classList.remove("lg-on");$("lg-pass").value="";
   stopListeners();loadedC={};booted=false;
   ["activos","aportes","ahorros","config"].forEach(listen);
 });
